@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ "$#" -lt 2 ]; then
+    echo 'doMast MOTIF_FILE FASTA_DIR'
+    exit 65
+fi
+
+MOTIF_FILE=$1
+FASTA_DIR=$2
+
+for i in $(ls $FASTA_DIR)
+do
+	org=$(echo $i | awk 'BEGIN { FS = "." } ; {print $1}')
+	mast $MOTIF_FILE $FASTA_DIR/$i -oc $org
+	mast $MOTIF_FILE $FASTA_DIR/$i -oc $org -hit_list > $org/hits.txt
+done
