@@ -1,0 +1,2 @@
+#!/bin/bash
+awk '{print "INSERT INTO `SMPanGenome`.`promoters` (`id`, `reverse`, `start`, `stop`, `sequence`, `method`,`score`, `score_threshold`, `regulator`) values (\""$1"\", "$2", "$3", "$4", \""$5"\", \""$6"\", "$7", "$8", \""$9"\");"}'
