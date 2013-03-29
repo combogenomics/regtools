@@ -1,0 +1,817 @@
+#! /usr/bin/python
+
+# MotifParser ##################################################################
+#
+# Copyright Marco Galardini 2010
+# Department of evolutionary genomics, University of Florence
+#
+
+################################################################################
+# Imports
+
+bExitForImportFailed=0
+try:
+    import sys
+    from time import strftime
+    from optparse import OptionParser, OptionGroup
+    import math
+    #
+    from decimal import *
+    getcontext().prec=53
+    #
+except Exception as e:
+    print 'Basic imports failed!'
+    print e
+    bExitForImportFailed=1
+
+################################################################################
+# Classes
+
+import sys
+
+# Exceptions ###################################################################
+class Error(Exception):
+    """Base class for exceptions in this module."""
+    pass
+
+class ReturnCodeError(Error):
+    """Exception raised because the return code was != 0"""
+    def __init__(self, code):
+        self.err = code
+    def __str__(self):
+        return repr(self.err)
+
+class ObjError(Error):
+    def __init__(self, err):
+        self.err = err
+    def __str__(self):
+        return repr(self.err)
+
+## Generic class ################################################################
+class DbeBase:
+    def __init__(self, logObj=None):
+        self.mylog = None
+        if logObj is None:
+            try:
+                self.mylog = LOG('Bioinfo.log')
+            except Exception, e:
+                self._LogException(e)
+                raise ObjError(e)
+        else:
+            self.mylog = logObj
+    # General internal methods
+    def _NoImplYet(self):
+        '''Log a No implementation message'''
+        self.mylog.WriteLog('WRN', 'Method not yet implemented')
+        raise ObjError("Method not yet implemented")
+    def _CmdLineErr(self):
+        '''Generic message about the error while creating the command line'''
+        self.mylog.WriteLog('ERR', 'Could not create the command line')
+        raise ObjError("Could not create the command line")
+    def _TryFileOpen(self, filename):
+        '''Try to open a file'''
+        try:
+            return open(filename)
+        except IOError:
+            raise IOError
+    def _LogException(self, e):
+        self.mylog.WriteLog('WRN', 'Exception was '+str(e))
+    def TryObj(self):
+        '''Verify the Object'''
+        pass
+
+# Logger #######################################################################
+class LOG:
+    '''Class that produces the log file'''
+    logTypes=['INF', 'DEV', 'ERR', 'WRN']
+    logTypeDefault='UNK'
+    logTypesUsed=['ERR', 'WRN', 'UNK']
+    def __init__(self, logFileName='Application.log', content='test_line', append=1):
+        try:
+            from time import strftime
+            self.logName=logFileName
+            if append == 1:    # The log is opened in append mode
+                self.file = open(self.logName, 'a')
+            else:    # Reading only -- for printing purposes
+                self.file = open(self.logName)
+            self.content=content
+            self.datetime=strftime("%Y-%m-%d %H:%M:%S")    # String containing date time values
+        except:
+            return
+    def AddLogType(self, logType):
+        '''Add a log type to the working ones'''
+        try:
+            self.logTypesUsed.append(logType)
+        except:
+            return
+    def CreateLine(self, logtype, strLog):
+        try:
+            from time import strftime
+            # Update date and time
+            self.datetime=strftime("%Y-%m-%d %H:%M:%S")
+            # Check the log type - if not managed put unknown
+            if logtype not in self.logTypes:
+                    logtype = self.logTypeDefault
+            # Concatenate the parts
+            self.content = self.datetime+' ['+logtype+'] '+strLog+'\n'
+        except:
+            return
+    def WriteLog(self, logtype, strLog):
+        try:
+            if logtype not in self.logTypesUsed:
+                return
+            self.CreateLine(logtype, strLog)
+            self.file.write(self.content)
+        except:
+            return
+    def FlushLog(self):
+        try:
+            import os
+            self.file.flush()
+            os.fsync(self.file.fileno())
+        except:
+            return
+    def RetrieveAllForHtml(self):
+        try:
+            # Returns all the lines of the log file and add a new-line for html
+            lines=self.file.readlines()
+            lines_html=[]
+            for l in lines:
+                l=l+'<br>'
+                lines_html.append(l)
+            return lines_html
+        except:
+            return []
+    def RetrieveAll(self):
+        try:
+            # Returns all the lines of the log file
+            lines=self.file.readlines()
+            return lines
+        except:
+            return []
+    def Close(self):
+        try:
+            self.file.close()
+        except:
+            return
+
+################################################################################
+# Color messages
+
+class Highlighter:
+    def __init__(self):
+        self._msgTypes={'INF':'\033[0m',
+                'IMP':'\033[1;32m',
+                'DEV':'\033[1;34m',
+                'ERR':'\033[1;31m',
+                'WRN':'\033[1;33m'}
+        self._reset='\033[0m'
+        self._default='INF'
+    def ColorMsg(self,msg,msgLevel='INF'):
+        try:
+            s=self._msgTypes[msgLevel]+msg+self._reset
+        except:s=s=self._msgTypes[self._default]+msg+self._reset
+        return s
+
+def ColorOutput(msg,msgLevel='INF'):
+    o=Highlighter()
+    return o.ColorMsg(msg,msgLevel)
+
+# Utility ######################################################################
+class UsrUtility:
+    def __init__(self):
+        pass
+    def OrderHitList(self, tHit, lTempOrder, lParking, iIndexStart, iIndexEnd):
+        # TODO:
+        # ADD a TRY here
+        # Just to be sure, check if End is bigger than Start
+        if tHit[iIndexStart] > tHit[iIndexEnd]:
+            iStart = tHit[iIndexEnd]
+            iEnd = tHit[iIndexStart]
+            tHit[iIndexStart] = iStart
+            tHit[iIndexEnd] = iEnd
+        else:
+            iStart = tHit[iIndexStart]
+            #iEnd = tHit[iIndexEnd]
+        # Remove the last - if the list is empty just put the query item
+        if len(lTempOrder) == 0:
+            lTempOrder.append(tHit)
+            return
+        else:
+            tTmp = lTempOrder.pop()
+        # Just to be sure, check if End is bigger than Start
+        if tTmp[iIndexStart] > tTmp[iIndexEnd]:
+            iTmpStart = tTmp[iIndexEnd]
+            iTmpEnd = tTmp[iIndexStart]
+            tTmp[iIndexStart] = iTmpStart
+            tTmp[iIndexEnd] = iTmpEnd
+        else:
+            iTmpStart = tTmp[iIndexStart]
+            #iTmpEnd = tTmp[iIndexEnd]
+        if iTmpStart > iStart:
+            # Just put the new item
+            lTempOrder.append(tTmp)
+            lTempOrder.append(tHit)
+        else:
+            # put the removed element in the parking line
+            # recursively check
+            lParking.append(tTmp)
+            self.OrderHitList(tHit, lTempOrder, lParking, iIndexStart, iIndexEnd)
+            lTempOrder.append(lParking.pop())
+    def OrderObjList(self, obj, lTempOrder, lParking):
+        '''The object need a start method which returns a string'''
+        # TODO:
+        # ADD a TRY here
+
+        # Remove the last - if the list is empty just put the query item
+        if len(lTempOrder) == 0:
+            lTempOrder.append(obj)
+            return
+        else:
+            oTmp = lTempOrder.pop()
+
+        if int(oTmp.start) > int(obj.start):
+            # Just put the new item
+            lTempOrder.append(oTmp)
+            lTempOrder.append(obj)
+        else:
+            # put the removed element in the parking line
+            # recursively check
+            lParking.append(oTmp)
+            self.OrderObjList(obj, lTempOrder, lParking)
+            lTempOrder.append(lParking.pop())
+
+# BioPython wrapper generic class ##############################################
+class BioPyWrapper(DbeBase):
+    def __init__(self, logObj=None):
+        try:DbeBase.__init__(self,logObj)
+        except Exception, e:raise ObjError(e)
+        try:
+            # Try to import BioPython
+            import Bio
+            self.mylog.WriteLog('DEV', 'Bioinfo module using BioPython')
+        except ImportError, e:
+            self.mylog.WriteLog('ERR', 'BioPython module not installed (1.54b or higher)')
+            self._LogException(e)
+            raise ObjError(e)
+
+# BioPython Seq wrapper ########################################################
+class BioSeq(BioPyWrapper):
+    def __init__(self, seq="",id="Generic_Seq",logObj=None):
+        try:BioPyWrapper.__init__(self,logObj)
+        except Exception, e:raise ObjError(e)
+        from Bio.Seq import Seq
+        self._seq=Seq(seq)
+        from Bio.Seq import SeqRecord
+        self._seqrec=SeqRecord(id=id,seq=self._seq)
+    def AddSeq(self,seq):
+        '''Add a sequence (generic)'''
+        try:
+            from Bio.Seq import Seq
+            self._seq=self._seq+Seq(str(seq))
+            self._seqrec=self._seqrec+Seq(str(seq))
+        except Exception, e:
+            self.mylog.WriteLog('WRN', 'ADD SEQ - Could not handle request')
+            self._LogException(e)
+            raise ObjError(e)
+    def getLen(self):
+        '''Return the length of a sequence'''
+        try:
+            return len(self._seq)
+        except Exception, e:
+            self.mylog.WriteLog('WRN', 'GET LEN - Could not handle request')
+            self._LogException(e)
+            raise ObjError(e)
+    def getGC(self):
+        '''Return the GC content of a sequence'''
+        try:
+            from Bio.SeqUtils import GC
+            return GC(self._seq)
+        except Exception, e:
+            self.mylog.WriteLog('WRN', 'GET GC - Could not handle request')
+            self._LogException(e)
+            raise ObjError(e)
+    def getSeq(self):
+        '''Return the seqrecord'''
+        return self._seqrec
+
+# BioPython SeqIO wrapper ######################################################
+class FastaSeqs(BioPyWrapper):
+    def __init__(self, logObj=None):
+        try:BioPyWrapper.__init__(self,logObj)
+        except Exception, e:raise ObjError(e)
+    # Parse FASTA file
+    def ParseFasta(self, sFile):
+        '''Parse a fasta file'''
+        try:
+            from Bio import SeqIO
+            try:
+                self.mylog.WriteLog('INF', 'Going to parse fasta file '+str(sFile))
+                result_handle = self._TryFileOpen(sFile)
+                self.file = sFile
+            except IOError:
+                self.mylog.WriteLog('ERR', 'Could not open file '+str(sFile))
+                raise ObjError("Could not open file "+str(sFile))
+            self._fasta = SeqIO.parse(result_handle,'fasta')
+            self.mylog.WriteLog('INF', 'Fasta file successefully parsed')
+            return 0
+        except Exception, e:
+            self.mylog.WriteLog('WRN', 'PARSE FASTA - Could not handle request')
+            self._LogException(e)
+            raise ObjError(e)
+    # After-parse methods
+    def GetSeqIDs(self):
+        '''Return a list of the sequences IDs'''
+        try:
+            lIDs = []
+            for s in self._fasta:
+                lIDs.append(s.id)
+            return lIDs
+        except Exception, e:
+            self.mylog.WriteLog('WRN', 'GET SEQUENCES NAMES - Could not handle request')
+            self._LogException(e)
+            raise ObjError(e)
+    def GetSeqs(self):
+        '''Return a list of the sequences'''
+        try:
+            ls = []
+            for s in self._fasta:
+                ls.append(s)
+            return ls
+        except Exception, e:
+            self.mylog.WriteLog('WRN', 'GET SEQUENCES - Could not handle request')
+            self._LogException(e)
+            raise ObjError(e)
+    def GenSeqs(self):
+        '''Return a list of the sequences'''
+        ls = []
+        for s in self._fasta:
+            yield s
+    # Write fasta sequences
+    def WriteSeqs(self, ls, sf):
+        '''Write the sequences in ls to a file named sf
+        Returns'''
+        try:
+            from Bio import SeqIO
+            SeqIO.write(ls, open(sf,'w'), 'fasta')
+            return 0
+        except Exception, e:
+            self.mylog.WriteLog('WRN', 'GET SEQUENCES - Could not handle request')
+            self._LogException(e)
+            raise ObjError(e)
+
+class Motif:
+    def __init__(self,id,reverse,start,stop,sequence,score,test=''):
+        self.id=str(id)
+        self.reverse=reverse
+        self.start=start
+        self.stop=stop
+        self.sequence=sequence
+        self.score=score
+        self.test=test
+
+################################################################################
+# Options
+
+def getOptions():
+    usage = "usage: python MotifParser.py [options]"
+    parser = OptionParser(usage)
+
+    group1 = OptionGroup(parser, "Inputs")
+    group1.add_option('-H', '--hmm', action="store_true", dest='hmm', default=False,
+            help='Hmm search?')
+    group1.add_option('-r', '--raw', action="store", dest='raw', default='results.raw',
+        help='hmmsearch domain output file [Default: "results.raw"]')
+    group1.add_option('-m', '--hmm-file', action="store", dest='hmmfile', default='regulator.hmm',
+        help='hmm motif file [Default: "regulator.hmm"]')
+    group1.add_option('-P', '--pwm', action="store_true", dest='pwm', default=False,
+            help='Pwm search?')
+    group1.add_option('-o', '--out', action="store", dest='out', default='pwm.out',
+        help='MotifSearch output file [Default: "pwm.out"]')
+    parser.add_option_group(group1)
+
+    group2 = OptionGroup(parser, "Options")
+    group2.add_option('-U', '--Threshold', action="store_true", dest='threshold', default=False,
+            help='User defined threshold?')
+    group2.add_option('-A', '--Accessions', action="store_true", dest='acc', default=False,
+            help='Print unique accessions numbers?')
+    group2.add_option('-a', '--AccFile', action="store", dest='accfile', default='accessions.tab',
+            help='File where the accessions will be printed [Default: accessions.tab]')
+    group2.add_option('-T', '--Details', action="store_true", dest='det', default=False,
+            help='Print promoters details?')
+    group2.add_option('-f', '--fasta', action="store", dest='fasta', default='promoters.faa',
+            help='Promoter regions fasta file [Default: promoters.faa]')
+    group2.add_option('-u', '--upstream', action="store", dest='up', default='600',
+            help='Promoter upstream region (basepairs) [Default: 600]')
+    group2.add_option('-s', '--database', action="store", dest='db', default='PanGenome',
+        help='Database name [Default: "PanGenome"]')
+    group2.add_option('-t', '--table', action="store", dest='table', default='promoters',
+        help='Table name [Default: "promoters"]')
+    group2.add_option('-g', '--regulator', action="store", dest='reg', default='XXXX',
+        help='Regulator name [Default: "XXXX"]')
+    group2.add_option('-R', '--Recovery', action="store_true", dest='recovery', default=False,
+            help='Try to get sub-optimal hits for some IDs?')
+    group2.add_option('-y', '--Recoveryfile', action="store", dest='recfile', default='recovery.tab',
+            help='IDs to be recovered [Default: recovery.tab]')
+    parser.add_option_group(group2)
+
+    group3 = OptionGroup(parser, "Logging and ouput")
+    group3.add_option('-V', '--verbose', action="store_true", dest='verbose', default=False,
+            help='Verbose? (LOG)')
+    group3.add_option('-D', '--development', action="store_true", dest='development', default=False,
+            help='Development? (LOG)')
+    group3.add_option('-w', '--working-dir', action="store", dest='wdir', default='./',
+            help='Working directory (it must be present) [Default: ./]')
+    parser.add_option_group(group3)
+
+    return parser.parse_args()
+
+################################################################################
+# Implementation
+
+def RetrieveSequence(start,stop,seq):
+    return seq[int(start)-1:int(stop)-1]
+
+def ParseHits(options,wdir,mylog):
+    #debug
+    sys.stderr.write(strftime("%H:%M:%S")+
+                    ' Going to parse Motif search output\n')
+    mylog.WriteLog('INF','Going to parse Motif search output')
+
+    #debug
+    sys.stderr.write(strftime("%H:%M:%S")+
+                    ' Looking for bits score distribution\n')
+    mylog.WriteLog('INF','Looking for bits score distribution')
+
+    if options.hmm:
+        #debug
+        sys.stderr.write(strftime("%H:%M:%S")+
+                    ' Looking for the input hmm ('+wdir+options.hmmfile+')'+
+                    ' to calculate the minimum length of a motif (at least 66%)\n')
+        mylog.WriteLog('INF','Looking for the input hmm ('+wdir+options.hmmfile+')'+
+                    ' to calculate the minimum length of a motif (at least 66%)')
+        # BugFix: Sequence should be longer than at least 66% of the input hmm
+        minLen=0
+        for line in open(wdir+options.hmmfile):
+            line=line.replace('\n','').replace('\r','')
+            if 'LENG  ' in line:
+                minLen=(float(line.replace('LENG  ',''))/float(100))*float(66)
+        # BugFix: At least more than 6 bases then!
+        if minLen==0:
+            minLen=6
+        #debug
+        sys.stderr.write(strftime("%H:%M:%S")+
+                    ' Minimum length: '+str(minLen)+'\n')
+        mylog.WriteLog('INF','Minimum length: '+str(minLen))
+
+    # Distribution check
+    d={}
+    all=[]
+
+    if options.hmm:
+        for l in open(options.raw):
+            if l[0]=='#':continue
+            l=l.replace('\n','').replace('\r','')
+            while '  ' in l:
+                l=l.replace('  ',' ')
+            s=l.split(' ')
+            if len(s) < 5:
+                continue
+            if float(s[13]) not in d:
+                d[float(s[13])]=1
+            else:
+                d[float(s[13])]=d[float(s[13])]+1
+            all.append(Decimal(s[13]))
+    elif options.pwm:
+        for l in open(options.out):
+            if l[0]=='#':continue
+            l=l.replace('\n','').replace('\r','')
+            while '  ' in l:
+                l=l.replace('  ',' ')
+            s=l.split('\t')
+            # BugFix: Memory and (hopefully) time saver
+#            if float(s[5]) not in d:
+#                d[float(s[5])]=1
+#            else:
+#                d[float(s[5])]=d[float(s[5])]+1
+            all.append(Decimal(s[5]))
+
+    a=d.keys()
+    a.sort()
+
+    length=Decimal(len(all))
+    tot=Decimal(0)
+
+    for k in a:
+        sys.stderr.write(str(k)+'\t'+str(d[k])+'\n')
+
+    for o in all:
+        tot=tot+o
+
+    if options.hmm:
+        #debug
+        sys.stderr.write(strftime("%H:%M:%S")+
+                        ' Writing the scores to '+wdir+'scores.tab for your normality tests\n')
+        mylog.WriteLog('INF','Writing the scores to '+wdir+'scores.tab for your normality tests')
+    elif options.pwm:
+        #debug
+        sys.stderr.write(strftime("%H:%M:%S")+
+                        ' Writing a sample of the scores to '+wdir+'scores.tab for your normality tests\n')
+        mylog.WriteLog('INF','Writing a sample of the scores to '+wdir+'scores.tab for your normality tests')
+    mean=Decimal(tot/length)
+
+    sys.stderr.write('Mean: '+str(mean)+'\n')
+    mylog.WriteLog('INF','Mean: '+str(mean))
+
+    if options.hmm:
+        std=Decimal(0)
+        for k in all:
+            std = std + Decimal(str(math.pow(abs(k - mean),2)))
+        stddev=Decimal(str(math.sqrt(std/length)))
+    elif options.pwm:
+        # ZScores are normal!
+        #debug
+        sys.stderr.write(strftime("%H:%M:%S")+
+                        ' Assuming a standard deviation of 1 for a ZScore corrected pwm search\n')
+        mylog.WriteLog('INF','Assuming a standard deviation of 1 for a ZScore corrected pwm search')
+        stddev=Decimal(1)
+
+    sys.stderr.write('Standard Deviation: '+str(stddev)+'\n')
+    mylog.WriteLog('INF','Standard Deviation: '+str(stddev))
+
+    if options.hmm:
+        f=open(wdir+'scores.tab','w')
+        for k in all:
+            f.write(str(k)+'\n')
+        f.close()
+    elif options.pwm:
+        f=open(wdir+'scores.tab','w')
+        i=0
+        for k in all:
+            f.write(str(k)+'\n')
+            i=i+1
+            if i>100000:
+                f.close()
+                break
+
+    sys.stderr.write('95% Threshold: '+str(mean+(Decimal(2)*stddev))+'\n')
+    mylog.WriteLog('INF','95% Threshold: '+str(mean+(Decimal(2)*stddev)))
+    sys.stderr.write('99.7% Threshold: '+str(mean+(Decimal(3)*stddev))+'\n')
+    mylog.WriteLog('INF','99.7% Threshold: '+str(mean+(Decimal(3)*stddev)))
+    #
+
+    # Ask the user for the threshold
+    if options.threshold:
+        b=1
+        sys.stderr.write('User defined threshold (WARNING: recovery will be disabled for this run)\n')
+        while b:
+            sys.stderr.write('Bits score threshold: ')
+            score=Decimal(raw_input())
+            try:
+                score
+                b=0
+            except:
+                sys.stderr.write('ATTENTION! Threshold should be float\n')
+    else:
+        # Recovery?
+        if options.recovery:
+            score=Decimal(mean+(Decimal('1.5')*stddev))
+            #debug
+            sys.stderr.write(strftime("%H:%M:%S")+
+                            ' Bit score threshold (recovery mode): '+str(score)+'\n')
+            mylog.WriteLog('INF','Bit score threshold (recovery mode): '+str(score))
+
+            #debug
+            sys.stderr.write(strftime("%H:%M:%S")+
+                            ' Reading the recovery IDs file\n')
+            mylog.WriteLog('INF','Reading the recovery IDs file')
+
+            lRecIDs=[]
+            for l in open(options.recfile):
+                lRecIDs.append(l.replace('\n','').replace('\r',''))
+        else:
+            score=Decimal(mean+(Decimal('3')*stddev))
+            #debug
+            sys.stderr.write(strftime("%H:%M:%S")+
+                            ' Bit score threshold: '+str(score)+'\n')
+            mylog.WriteLog('INF','Bit score threshold: '+str(score))
+
+    #debug
+    sys.stderr.write(strftime("%H:%M:%S")+
+                    ' Reading the promoters fasta file\n')
+    mylog.WriteLog('INF','Reading the promoters fasta file')
+
+    if options.hmm:
+        Obj=FastaSeqs(mylog)
+        res = Obj.ParseFasta(options.fasta)
+        if res != 0:
+            #debug
+            sys.stderr.write(strftime("%H:%M:%S")+
+                        ' Sequence parsing failed!\n')
+            mylog.WriteLog('ERR','Sequence parsing failed!')
+            sys.exit()
+
+        lS=Obj.GetSeqs()
+        dS={}
+        for s in lS:
+            dS[s.id]=s
+
+    lH=[]
+    if options.hmm:
+        for l in open(options.raw):
+            if l[0]=='#':continue
+            l=l.replace('\n','').replace('\r','')
+            while '  ' in l:
+                l=l.replace('  ',' ')
+            s=l.split(' ')
+            if len(s) < 5:
+                continue
+            if Decimal(s[13]) > score:
+                if '_rvrs_cmplmnt' in s[0]:
+                    seq=RetrieveSequence(int(s[17]),int(s[18]),
+                            str(dS[s[0]].seq))
+                    # BugFix: Sequence should be longer than at least 66% of the input hmm
+                    if len(seq)<minLen:continue
+                    #
+                    lH.append(Motif(s[0].replace('_rvrs_cmplmnt',''),1,
+                        int(s[17]),int(s[18]),seq,Decimal(s[13])))
+                else:
+                    seq=RetrieveSequence(int(s[17]),int(s[18]),
+                            str(dS[s[0]].seq))
+                    # BugFix: Sequence should be longer than at least 66% of the input hmm
+                    if len(seq)<minLen:continue
+                    #
+                    lH.append(Motif(s[0],0,int(s[17]),int(s[18]),
+                        seq,Decimal(s[13])))
+    elif options.pwm:
+        for l in open(options.out):
+            if l[0]=='#':continue
+            l=l.replace('\n','').replace('\r','')
+            while '  ' in l:
+                l=l.replace('  ',' ')
+            s=l.split('\t')
+            if Decimal(s[5]) > score:
+                if '_rvrs_cmplmnt' in s[0]:
+                    lH.append(Motif(s[0].replace('_rvrs_cmplmnt',''),1,
+                        int(s[1]),int(s[2]),s[6],Decimal(s[5])))
+                else:
+                    lH.append(Motif(s[0],0,int(s[1]),int(s[2]),s[6],
+                        Decimal(s[5])))
+
+    #debug
+    sys.stderr.write(strftime("%H:%M:%S")+
+                    ' Total hits: '+str(len(all))+'\n')
+    mylog.WriteLog('INF','Total hits: '+str(len(all)))
+    #debug
+    sys.stderr.write(strftime("%H:%M:%S")+
+                    ' Hits over threshold: '+str(len(lH))+'\n')
+    mylog.WriteLog('INF','Hits over threshold: '+str(len(lH)))
+
+    if options.acc:
+        #debug
+        sys.stderr.write(strftime("%H:%M:%S")+
+                        ' Writing the unique accession numbers to '+wdir+options.accfile+'\n')
+        mylog.WriteLog('INF','Writing the unique accession numbers to '+wdir+options.accfile)
+        # Print just the unique accessions
+        lA=[]
+        for h in lH:
+            if h.id not in lA:
+                lA.append(h.id)
+        lA.sort()
+        f=open(wdir+options.accfile,'w')
+        for h in lA:
+            if options.recovery and h not in lRecIDs:continue
+            f.write(str(h)+'\n')
+        f.close()
+
+    # Debug
+    if options.development:
+        debugIDs=[]
+    #
+    
+    #print 'BEGIN;SET autocommit=0;'
+
+    for h in lH:
+        if options.recovery and h.id not in lRecIDs:continue
+        #INSERT INTO `SMPanGenome`.`promoters` (`id`, `reverse`, `start`, `stop
+        #`sequence`, `method`, `score`, `score_threshold`) VALUES
+        #('1', '2', '3', '4', '5', '6', '7', '8');
+        sql=('INSERT INTO `'+options.db+'`.`'+options.table+
+             '` (`id`, `reverse`, `start`, `stop`, `sequence`, `method`,'+
+             ' `score`, `score_threshold`, `regulator`, `suboptimal`) VALUES ('+
+             '\''+h.id+'\', ')
+        # Debug
+        if options.development:
+            if h.id not in debugIDs:
+                debugIDs.append(h.id)
+        #
+        if h.reverse:
+            sql=sql+'1, '
+            rev = '1'
+        else:
+            sql=sql+'0, '
+            rev = '0'
+        if not h.reverse:
+            sql=sql+str(h.start-int(options.up)-1)+', '+str(h.stop-int(options.up)-1)+', '
+            before = str(h.start-int(options.up)-1)
+            after = str(h.stop-int(options.up)-1)
+        else:
+            sql=sql+str(-h.stop+101)+', '+str(-h.start+101)+', '
+            before = str(-h.stop+101)
+            after = str(-h.start+101)
+            #sql=sql+str(-int(options.up)+100-(h.stop-int(options.up)-1))+', '+str(-int(options.up)+100-(h.start-int(options.up)-1))+', '
+        sql=sql+'\''+h.sequence+'\', '
+        if options.hmm:
+            sql=sql+'\'hmm\', '
+            method = 'hmm'
+        elif options.pwm:
+            sql=sql+'\'pwm\', '
+            method = 'pwm'
+        sql=sql+'\''+str(h.score)+'\', \''+str(score)+'\', '
+        sql=sql+'\''+options.reg+'\', '
+        if options.recovery:
+            sql=sql+'1);'
+        else:
+            sql=sql+'0);'
+        #print sql
+        print '\t'.join([h.id, rev, before, after, h.sequence, method,
+                        str(h.score), str(score), options.reg])
+    
+    #print 'COMMIT;'
+
+    # Debug
+    if options.development:
+        debugIDs.sort()
+        for i in debugIDs:
+            sys.stderr.write(i+'\n')
+
+################################################################################
+# Main
+
+def MotifParser():
+#    try:
+    #debug
+    sys.stderr.write(strftime("%Y-%m-%d %H:%M:%S")+
+                            ' Starting MotifParser\n')
+
+    (options, args) = getOptions()
+
+    # Fail-safe check
+    wdir = ''
+    if options.wdir[-1] != '\\' and options.wdir[-1] != '/':
+        wdir = options.wdir + '/'
+    else:
+        wdir = options.wdir
+
+    mylog = LOG(wdir+'MotifParser.log')
+
+    if options.verbose:
+        mylog.AddLogType('INF')
+    if options.development:
+        mylog.AddLogType('DEV')
+
+    mylog.WriteLog('INF','Starting Starting MotifParser')
+
+    # Options checks
+    if((options.hmm and options.pwm) or (options.raw=='' and options.out=='')
+            or (options.hmm and options.raw=='') or (options.pwm and options.out=='')):
+        mylog.WriteLog('ERR','Missing mandatory parameters!')
+        sys.stderr.write(strftime("%H:%M:%S")+' ERROR: missing mandatory parameters!\n')
+        if (options.hmm and options.pwm):
+            sys.stderr.write(strftime("%H:%M:%S")+' HINT: -H and -P are mutually exclusive!\n')
+        if (options.raw=='' and options.out==''):
+            sys.stderr.write(strftime("%H:%M:%S")+' HINT: An input file may be missing!\n')
+        sys.exit()
+    try:
+        int(options.up)
+    except:
+        mylog.WriteLog('ERR','Upstream parameter should be integer!')
+        sys.stderr.write(strftime("%H:%M:%S")+' ERROR: Upstream '+
+            'parameter should be integer!\n')
+        sys.exit()
+
+    # Start!
+    ParseHits(options,wdir,mylog)
+    # End!
+
+    #debug
+    sys.stderr.write(strftime("%Y-%m-%d %H:%M:%S")+
+                            ' Stopping MotifParser\n')
+    mylog.WriteLog('INF','Stopping MotifParser')
+#    except Exception as e:
+#        try:
+#            mylog
+#        except:
+#            mylog = LOG('MotifParser.log')
+#        mylog.WriteLog('ERR',str(e))
+#        sys.stderr.write(strftime("%H:%M:%S")+' ERROR: '+str(e)+'\n')
+
+def main():
+    if bExitForImportFailed:
+        pass
+    else:
+        MotifParser()
+    pass
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if [ "$#" -lt 2 ]; then
+    echo 'doMast MOTIF_FILE PROMOTERS_FASTA_DIR'
+    exit 65
+fi
+
+MOTIF_FILE=$1
+FASTA_DIR=$2
+
+for i in $(ls $FASTA_DIR)
+do
+	org=$(echo $i | awk 'BEGIN { FS = "." } ; {print $1}')
+	echo $org $MOTIF_FILE
+	hmmsearch --max -T -100 --domT -100 --tblout $org.out --domtblout $org.raw $MOTIF_FILE $FASTA_DIR/$i > /dev/null
+done
