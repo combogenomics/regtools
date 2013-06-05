@@ -24,9 +24,9 @@ def nice_write(s,ind=60):
 def rev_complement(seq):
 	# get reverse complement of a sequence
 	d= {'A': 'T', 'C': 'G',
-		'G': 'C', 'T': 'A',
-		'a': 't', 'c': 'g', 
-		'g': 'c', 't': 'a'}
+	    'G': 'C', 'T': 'A',
+	    'a': 't', 'c': 'g', 
+	    'g': 'c', 't': 'a'}
 	rev_compl=''.join(d.get(n) for n in seq[::-1])
 	return rev_compl
 
@@ -151,45 +151,13 @@ class Upstream(object):
 	#
 #
 
-##########################
-# some plain examples of entrez
-
-#Entrez.email="sadad@omfg.com" # real mail pls
-
-#handle = Entrez.einfo() # extract some infos from Eutils
-#result = handle.read()
-# get useless xml
-
-#handle = Entrez.einfo()
-#result = Entrez.read(handle)
-# parse xml to dict -> result
-
-#result.keys()
-#result['DbList']
-# see keys
-
-### serious stuff...
-# Accession -> genome
-
-#accession = "NC_000913"
-
-#handle = Entrez.efetch(db="nucleotide",
-#					   id=accession,
-#					   rettype="gb")
-
-#record = SeqIO.read(handle,"genbank")
-#handle.close()
-
-#features=record.features # these are features objects!
-#whole_genome= record.seq.tostring()
-
 
 ############################
 #          Inputs          #
 ############################
 
-usage='''python entrez_getter.py ORGANISM
-		 if organism name is unknown, try using "list_genbank_id.sh"
+usage='''python upstream_getter.py ORGANISM
+         if organism name is unknown, try using "list_genbank_id.sh"
 '''
 
 if __name__=='__main__':
