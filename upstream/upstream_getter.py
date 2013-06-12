@@ -194,6 +194,7 @@ if __name__ == '__main__':
         genes=get_genes(replicon)
         whole_seq=get_whole_genome_seq(replicon)
         upstreams=get_all_upstreams(genes,whole_seq, b_up, b_down, is_circ)
+        if not upstreams:continue
         file_name='%s_%s_upstreams.fasta' %(organism,replicon.id)
         infos=(organism,replicon.id)
         export_upstreams(upstreams,file_name,infos)
