@@ -180,6 +180,9 @@ if __name__ == '__main__':
 		print replicon
 		record = get_from_genbank(replicon)
 		genes=get_genes(record)
+		if len(genes)==0:
+			print 'no genes in', replicon
+			continue
 		whole_seq=get_whole_genome_seq(record)
 		upstreams=get_all_upstreams(genes,whole_seq)
 		file_name='%s_%s_upstreams.fasta' %(organism,replicon)
