@@ -63,49 +63,57 @@ def get_whole_genome_seq(record):
 	whole_genome= record.seq.tostring()
 	return whole_genome
 
-def get_subseq(tupla,genome_seq,flag=False):
+def get_subseq(tupla,genome_seq,flag=False,b_up=400,b_down=0):
 	#given some indices, return the corresponding genomic subseq
-	strand=tupla[-1]
-	if tupla[0] <= tupla[1]:
-		if strand == '+':
-			left=max(tupla[0],tupla[1]-400)
-			right=tupla[1]
-			return whole_seq[left:right]
-		else:
-			left=tupla[0]
-			right=min(tupla[1],tupla[0]+400)
-			return rev_complement(whole_seq[left:right])
-	if flag == 'wrapped around':
-		if strand=='+':
-			seq= ( whole_seq[tupla[0]:]
-					+
-					whole_seq[:tupla[1]]
-					)
-			if len(seq) > 400:
-				seq=seq[-400:]
-			return seq
-		else:
-			seq= (  rev_complement(whole_seq[:tupla[1]])
-				+
-				rev_complement(whole_seq[tupla[0]:])
-					)
-			if len(seq) > 400:
-				seq=seq[-400:]
-			return seq
-	return ''
+    strand=tupla[-1]
+    if tupla[0] <= tupla[1]:
+        if strand == '+':
+            left=max(tupla[0],tupla[1]-b_up)
+            right=tupla[1]+b_down
+            return whole_seq[left:right]
+        else:
+            left=tupla[0]-b_down
+            right=min(tupla[1],tupla[0]+b_up)
+            return rev_complement(whole_seq[left:right])
+    if flag == 'wrapped around':
+        if strand=='+':
+            seq= ( whole_seq[tupla[0]:]
+                    +
+                    whole_seq[:tupla[1]+b_down]
+                    )
+            if len(seq) > b_up+b_down:
+                seq=seq[-b_up:]
+            return seq
+        else:
+            seq= (  rev_complement(whole_seq[:tupla[1]])
+                +
+                rev_complement(whole_seq[tupla[0]-b_down:])
+                    )
+            if len(seq) > b_up+b_down:
+                seq=seq[-b_up:]
+            return seq
+    return ''
 
-def get_all_upstreams(genes,whole_seq):
+def get_all_upstreams(genes,whole_seq,b_up=400,b_down=0):
 	tot=len(genes)
-	upstr=[  (genes[i-1].end,genes[i].start,genes[i].name,genes[i].strand) if genes[i].strand == '+'
-				else 
-			 (genes[i].end,genes[i+1].start,genes[i].name,genes[i].strand)
-				for i in range(-1,tot-1)]
-	upstr= upstr[1:] + [upstr[0]]
-	print upstr[0][2]
-	out=[Upstream(upstr[0][2],upstr[0][1],upstr[0][0],get_subseq(upstr[0],whole_seq,'wrapped around'),upstr[0][3])]
-	out+=[Upstream(up[2],up[1],up[0],get_subseq(up,whole_seq),up[3]) for up in upstr[1:tot - 1]]
-	out+=[Upstream(upstr[-1][2],upstr[-1][1],upstr[-1][0],get_subseq(upstr[-1],whole_seq,'wrapped around'),upstr[-1][3])]
-	return out
+    if tot == 0:
+        return
+    elif tot == 1:
+        if genes[0].strand == '+':
+            upstr = [(genes[0].start-b_up,genes[0].start+b_down,genes[0].name,genes[0].strand)]
+        else:
+            upstr = [(genes[0].end-b_down,genes[0].end+b_up,genes[0].name,genes[0].strand)]
+    else:
+        upstr=[  (genes[i-1].end,genes[i].start,genes[i].name,genes[i].strand) if genes[i].strand == '+'
+                    else 
+                 (genes[i].end,genes[i+1].start,genes[i].name,genes[i].strand)
+                    for i in range(-1,tot-1)]
+        upstr= upstr[1:] + [upstr[0]]
+    print upstr[0][2]
+    out=[Upstream(upstr[0][2],upstr[0][1],upstr[0][0],get_subseq(upstr[0],whole_seq,'wrapped around',b_up,b_down),upstr[0][3])]
+    out+=[Upstream(up[2],up[1],up[0],get_subseq(up,whole_seq,b_up=b_up,b_down=b_down),up[3]) for up in upstr[1:tot - 1]]
+    out+=[Upstream(upstr[-1][2],upstr[-1][1],upstr[-1][0],get_subseq(upstr[-1],whole_seq,'wrapped around',b_up,b_down),upstr[-1][3])]
+    return out
 
 def export_upstreams(upstreams,nome_out,infos):
 	out=open(nome_out,'w')
@@ -156,14 +164,14 @@ class Upstream(object):
 #          Inputs          #
 ############################
 
-usage='''python upstream_getter.py ORGANISM
+usage='''python upstream_getter.py ORGANISM bases_up bases_down
          if organism name is unknown, try using "list_genbank_id.sh"
 '''
 
 if __name__=='__main__':
 	# do stuff
 	args=sys.argv
-	try: organism=args[1]
+	try: organism, b_up, b_down = args[1:4]
 	except:
 		print usage
 		sys.exit()
@@ -181,7 +189,7 @@ if __name__ == '__main__':
 		record = get_from_genbank(replicon)
 		genes=get_genes(record)
 		whole_seq=get_whole_genome_seq(record)
-		upstreams=get_all_upstreams(genes,whole_seq)
+		upstreams=get_all_upstreams(genes,whole_seq,b_up,b_down)
 		file_name='%s_%s_upstreams.fasta' %(organism,replicon)
 		infos=(organism,replicon)
 		export_upstreams(upstreams,file_name,infos)
