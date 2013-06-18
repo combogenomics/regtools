@@ -183,15 +183,18 @@ if __name__=='__main__':
 ############################
 
 if __name__ == '__main__':
-    # do stuff
-    replicons = get_replicons(organism)
-    print 'working on these molecules...'
-    for replicon in replicons:
-        print replicon
-        record = get_from_genbank(replicon)
-        genes=get_genes(record)
-        whole_seq=get_whole_genome_seq(record)
-        upstreams=get_all_upstreams(genes,whole_seq,b_up,b_down)
-        file_name='%s_%s_upstreams.fasta' %(organism,replicon)
-        infos=(organism,replicon)
-        export_upstreams(upstreams,file_name,infos)
+	# do stuff
+	replicons = get_replicons(organism)
+	print 'working on these molecules...'
+	for replicon in replicons:
+		print replicon
+		record = get_from_genbank(replicon)
+		genes=get_genes(record)
+		if len(genes)==0:
+			print 'no genes in', replicon
+			continue
+		whole_seq=get_whole_genome_seq(record)
+		upstreams=get_all_upstreams(genes,whole_seq)
+		file_name='%s_%s_upstreams.fasta' %(organism,replicon)
+		infos=(organism,replicon)
+		export_upstreams(upstreams,file_name,infos)
