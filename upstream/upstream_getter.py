@@ -102,6 +102,50 @@ def get_subseq(tupla,genome_seq,flag=False,b_up=400,b_down=0):
             right=tupla[0]
             return rev_complement(whole_seq[left:right]) 
      return ''
+     
+def get_subseq_all(tupla,genome_seq,flag=False,b_up=400,b_down=0):
+    #given some indices, return the corresponding genomic subseq
+     strand=tupla[-1]
+     if tupla[0] <= tupla[1]:
+          if strand == '+':
+                left=tupla[0]-b_up
+                if left < 0:
+                    left = 0
+                right=tupla[1]+b_down
+                return whole_seq[left:right]
+          else:
+                left=tupla[0]-b_down
+                right=tupla[0]+b_up
+                if right > len(whole_seq):
+                    right = len(whole_seq)
+                return rev_complement(whole_seq[left:right])
+     if flag == 'wrapped around':
+          if strand=='+':
+                seq= ( whole_seq[tupla[0]:]
+                          +
+                          whole_seq[:tupla[1]+b_down]
+                          )
+                if len(seq) > b_up+b_down:
+                     seq=seq[-b_up:]
+                return seq
+          else:
+                seq= (  rev_complement(whole_seq[:tupla[1]])
+                     +
+                     rev_complement(whole_seq[tupla[0]-b_down:])
+                          )
+                if len(seq) > b_up+b_down:
+                     seq=seq[-b_up:]
+                return seq
+     if b_down > 0:
+        if strand == '+':
+            left=tupla[1]
+            right=tupla[1]+b_down
+            return whole_seq[left:right]
+        else:
+            left=tupla[0]-b_down
+            right=tupla[0]
+            return rev_complement(whole_seq[left:right]) 
+     return ''
 
 def get_all_upstreams(genes,whole_seq,b_up=400,b_down=0,is_circ=True):
     tot=len(genes)
@@ -109,9 +153,9 @@ def get_all_upstreams(genes,whole_seq,b_up=400,b_down=0,is_circ=True):
         return
     elif tot == 1:
         if genes[0].strand == '+':
-            upstr = [(genes[0].start-b_up,genes[0].start+b_down,genes[0].name,genes[0].strand)]
+            upstr = [(genes[0].start,genes[0].start,genes[0].name,genes[0].strand)]
         else:
-            upstr = [(genes[0].end-b_down,genes[0].end+b_up,genes[0].name,genes[0].strand)]
+            upstr = [(genes[0].end,genes[0].end,genes[0].name,genes[0].strand)]
     else:
         upstr=[  (genes[i-1].end,genes[i].start,genes[i].name,genes[i].strand) if genes[i].strand == '+'
                     else 
@@ -124,6 +168,29 @@ def get_all_upstreams(genes,whole_seq,b_up=400,b_down=0,is_circ=True):
         out+=[Upstream(upstr[-1][2],upstr[-1][1],upstr[-1][0],get_subseq(upstr[-1],whole_seq,'wrapped around',b_up,b_down),upstr[-1][3],b_up,b_down)]
     else:
         out=[Upstream(up[2],up[1],up[0],get_subseq(up,whole_seq,b_up=b_up,b_down=b_down),up[3],b_up,b_down) for up in upstr]
+    return out
+    
+def get_all_upstreams_all(genes,whole_seq,b_up=400,b_down=0,is_circ=True):
+    tot=len(genes)
+    if tot == 0:
+        return
+    elif tot == 1:
+        if genes[0].strand == '+':
+            upstr = [(genes[0].start,genes[0].start,genes[0].name,genes[0].strand)]
+        else:
+            upstr = [(genes[0].end,genes[0].end,genes[0].name,genes[0].strand)]
+    else:
+        upstr=[  (genes[i].start,genes[i].start,genes[i].name,genes[i].strand) if genes[i].strand == '+'
+                    else 
+                 (genes[i].end,genes[i].end,genes[i].name,genes[i].strand)
+                    for i in range(-1,tot-1)]
+        upstr= upstr[1:] + [upstr[0]]
+    if is_circ:
+        out=[Upstream(upstr[0][2],upstr[0][1],upstr[0][0],get_subseq_all(upstr[0],whole_seq,'wrapped around',b_up,b_down),upstr[0][3],b_up,b_down)]
+        out+=[Upstream(up[2],up[1],up[0],get_subseq_all(up,whole_seq,b_up=b_up,b_down=b_down),up[3],b_up,b_down) for up in upstr[1:tot - 1]]
+        out+=[Upstream(upstr[-1][2],upstr[-1][1],upstr[-1][0],get_subseq_all(upstr[-1],whole_seq,'wrapped around',b_up,b_down),upstr[-1][3],b_up,b_down)]
+    else:
+        out=[Upstream(up[2],up[1],up[0],get_subseq_all(up,whole_seq,b_up=b_up,b_down=b_down),up[3],b_up,b_down) for up in upstr]
     return out
 
 def export_upstreams(upstreams,nome_out,infos):
@@ -208,6 +275,10 @@ def getOptions():
                             dest='one_file',
                             default=False,
                         help='Save everything in one file')
+    parser.add_argument('-a', '--all', action="store_true",
+                            dest='all',
+                            default=False,
+                        help='Save ALL upstream regions (not considering genes overlaps)')
     
     return parser.parse_args()
 
@@ -219,6 +290,7 @@ if __name__=='__main__':
     b_down = options.b_down
     is_circ = not options.linear
     one_file = options.one_file
+    all_up = options.all
 
 ############################
 #              Main              #
@@ -245,7 +317,10 @@ if __name__ == '__main__':
             print 'no genes in', replicon
             continue
         whole_seq=get_whole_genome_seq(record)
-        upstreams=get_all_upstreams(genes,whole_seq, b_up, b_down, is_circ)
+        if not all_up:
+            upstreams=get_all_upstreams(genes,whole_seq, b_up, b_down, is_circ)
+        else:
+            upstreams=get_all_upstreams_all(genes,whole_seq, b_up, b_down, is_circ)
         if not upstreams:continue
         file_name='%s_%s_upstreams.fasta' %(organism,replicon)
         infos=(organism,replicon)
