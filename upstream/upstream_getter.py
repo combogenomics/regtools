@@ -5,6 +5,7 @@
 from Bio import Entrez, SeqIO
 from Bio.Seq import Seq
 import sys,os
+import argparse
 
 ############################
 #          Functions            #
@@ -182,21 +183,42 @@ class Upstream(object):
 #             Inputs             #
 ############################
 
-usage='''python upstream_getter.py ORGANISM bases_up bases_down IS_CIRCULAR
-            if organism name is unknown, try using "list_genbank_id.sh"
-'''
+def getOptions():
+    description = "Get up and downstream sequences from genomes"
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('orgID', action='store',
+                            help='Organism ID, as in the NCBI database (or genbank file if -f)')
+    parser.add_argument('-u', metavar='upstream', action='store',
+                        dest='b_up',
+                        type=int,
+                        default=400,
+                        help='Upstream bases')
+    parser.add_argument('-d', metavar='downstream', action='store',
+                        dest='b_down',
+                        type=int,
+                        default=100,
+                        help='Downstream bases')
+    parser.add_argument('-f', '--file', action="store_true",
+                            default=False,
+                        help='Use a genbank file instead of downloading from NCBI (useful for draft unannotated genomes)')
+    parser.add_argument('-l', '--linear', action="store_true",
+                            default=False,
+                        help='Linear or draft genome')
+    parser.add_argument('-o', '--one-file', action="store_true",
+                            dest='one_file',
+                            default=False,
+                        help='Save everything in one file')
+    
+    return parser.parse_args()
 
 if __name__=='__main__':
-    # do stuff
-    args=sys.argv
-    try:
-        organism, b_up, b_down, is_circ = args[1:5]
-        b_up = int(b_up)
-        b_down = int(b_down)
-        is_circ=bool(is_circ)
-    except:
-        print usage
-        sys.exit()
+    options = getOptions()
+    organism = options.orgID
+    is_file = options.file
+    b_up = options.b_up
+    b_down = options.b_down
+    is_circ = not options.linear
+    one_file = options.one_file
 
 ############################
 #              Main              #
@@ -204,11 +226,20 @@ if __name__=='__main__':
 
 if __name__ == '__main__':
 	# do stuff
-	replicons = get_replicons(organism)
+	all_upstream = []
+	if is_file:
+		sequences = [s for s in SeqIO.parse(open(organism), 'genbank')]
+		replicons = [s.id for s in sequences]
+	else:
+		replicons = get_replicons(organism)
+    
 	print 'working on these molecules...'
 	for replicon in replicons:
 		print replicon
-		record = get_from_genbank(replicon)
+		if is_file:
+			record = filter(lambda x: x.id == replicon, sequences)[0]
+		else:
+			record = get_from_genbank(replicon)
 		genes=get_genes(record)
 		if len(genes)==0:
 			print 'no genes in', replicon
@@ -218,4 +249,10 @@ if __name__ == '__main__':
 		if not upstreams:continue
 		file_name='%s_%s_upstreams.fasta' %(organism,replicon)
 		infos=(organism,replicon)
-		export_upstreams(upstreams,file_name,infos)
+		if not one_file:
+			export_upstreams(upstreams,file_name,infos)
+		else:
+			for up in upstreams:
+				all_upstream.append(up)
+	if one_file:
+		export_upstreams(all_upstream, '%s_upstreams.fasta' %(organism), (organism,'all'))
