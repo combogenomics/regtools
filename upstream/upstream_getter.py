@@ -24,10 +24,10 @@ def nice_write(s,ind=60):
 def rev_complement(seq):
     # get reverse complement of a sequence
     d= {'A': 'T', 'C': 'G',
-         'G': 'C', 'T': 'A',
-         'a': 't', 'c': 'g', 
-         'g': 'c', 't': 'a'}
-    rev_compl=''.join(d.get(n) for n in seq[::-1])
+        'G': 'C', 'T': 'A',
+        'a': 't', 'c': 'g', 
+        'g': 'c', 't': 'a'}
+    rev_compl=''.join(d.get(n, 'N') for n in seq[::-1])
     return rev_compl
 
 def get_replicons(strain):
