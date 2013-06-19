@@ -225,34 +225,34 @@ if __name__=='__main__':
 ############################
 
 if __name__ == '__main__':
-	# do stuff
-	all_upstream = []
-	if is_file:
-		sequences = [s for s in SeqIO.parse(open(organism), 'genbank')]
-		replicons = [s.id for s in sequences]
-	else:
-		replicons = get_replicons(organism)
+    # do stuff
+    all_upstream = []
+    if is_file:
+        sequences = [s for s in SeqIO.parse(open(organism), 'genbank')]
+        replicons = [s.id for s in sequences]
+    else:
+        replicons = get_replicons(organism)
     
-	print 'working on these molecules...'
-	for replicon in replicons:
-		print replicon
-		if is_file:
-			record = filter(lambda x: x.id == replicon, sequences)[0]
-		else:
-			record = get_from_genbank(replicon)
-		genes=get_genes(record)
-		if len(genes)==0:
-			print 'no genes in', replicon
-			continue
-		whole_seq=get_whole_genome_seq(record)
-		upstreams=get_all_upstreams(genes,whole_seq, b_up, b_down, is_circ)
-		if not upstreams:continue
-		file_name='%s_%s_upstreams.fasta' %(organism,replicon)
-		infos=(organism,replicon)
-		if not one_file:
-			export_upstreams(upstreams,file_name,infos)
-		else:
-			for up in upstreams:
-				all_upstream.append(up)
-	if one_file:
-		export_upstreams(all_upstream, '%s_upstreams.fasta' %(organism), (organism,'all'))
+    print 'working on these molecules...'
+    for replicon in replicons:
+        print replicon
+        if is_file:
+            record = filter(lambda x: x.id == replicon, sequences)[0]
+        else:
+            record = get_from_genbank(replicon)
+        genes=get_genes(record)
+        if len(genes)==0:
+            print 'no genes in', replicon
+            continue
+        whole_seq=get_whole_genome_seq(record)
+        upstreams=get_all_upstreams(genes,whole_seq, b_up, b_down, is_circ)
+        if not upstreams:continue
+        file_name='%s_%s_upstreams.fasta' %(organism,replicon)
+        infos=(organism,replicon)
+        if not one_file:
+            export_upstreams(upstreams,file_name,infos)
+        else:
+            for up in upstreams:
+                all_upstream.append(up)
+    if one_file:
+        export_upstreams(all_upstream, '%s_upstreams.fasta' %(organism), (organism,'all'))
