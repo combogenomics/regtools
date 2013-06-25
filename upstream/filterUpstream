@@ -1,0 +1,25 @@
+#!/usr/bin/python
+'''
+Filter a file with upstream sequences and output only those with ID in the locusfile
+'''
+
+import sys
+if len(sys.argv) != 4:
+	print "filterUpstream locusfile upstreamfile output"
+	sys.exit(1)
+locusf = sys.argv[1]
+upstreamf = sys.argv[2]
+outf = sys.argv[3] 
+
+f = open(locusf, 'r')
+
+locus = [x.strip() for x in f.readlines()]
+
+f.close()
+
+from Bio import SeqIO
+upstream = []
+for seq in SeqIO.parse(upstreamf, "fasta"):
+	if seq.id.rstrip(";") in locus:
+		upstream.append(seq)
+SeqIO.write(upstream, outf, "fasta")
