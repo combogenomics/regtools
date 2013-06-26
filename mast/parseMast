@@ -39,7 +39,7 @@ def getOptions():
     parser.add_argument('-o', '--order', action="store_true",
             default=False,
             dest='order',
-            help='The motif has to found in forward with the gene (not for palindromic motifs)')
+            help='The motif has to be found in forward with the gene (not for palindromic motifs)')
     parser.add_argument('-f', '--fasta', action="store_true",
             default=False,
             dest='fasta',
