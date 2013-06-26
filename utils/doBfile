@@ -11,5 +11,5 @@ for i in $(ls $FASTA_DIR | grep ".fa")
 do
     strain=$(echo $i | awk 'BEGIN {FS = "."};{print $1}')
     echo $strain
-    cat $FASTA_DIR/$i | fasta-get-markov -m 5 > $strain.ntfreq.m5
+    cat $FASTA_DIR/$i | fasta-get-markov -m 3 > $strain.ntfreq
 done
