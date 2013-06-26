@@ -1,13 +1,12 @@
 #!/bin/bash
 
-if [ "$#" -lt 3 ]; then
-    echo 'autoMast MOTIF_DIR FASTA_DIR BFILE_DIR'
+if [ "$#" -lt 2 ]; then
+    echo 'autoMast MOTIF_DIR FASTA_DIR'
     exit 65
 fi
 
 MOTIF_DIR=$1
 FASTA_DIR=$2
-BFILE_DIR=$3
 
 for reg in $(ls -d $MOTIF_DIR/*/)
 do
@@ -16,6 +15,6 @@ do
 	for meme in $(ls -d $reg/*/)
 	do
 	    let "count += 1"
-	    echo './doMast '$meme'/meme.txt '$FASTA_DIR' '$BFILE_DIR' '$regulator'_'$count
+	    echo './doMast '$meme'/meme.txt '$FASTA_DIR' '$regulator'_'$count
 	done
 done

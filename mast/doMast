@@ -1,18 +1,17 @@
 #!/bin/bash
 
-if [ "$#" -lt 4 ]; then
-    echo 'doMast MOTIF_FILE FASTA_DIR BFILE_DIR REGULATOR_NAME'
+if [ "$#" -lt 3 ]; then
+    echo 'doMast MOTIF_FILE FASTA_DIR REGULATOR_NAME'
     exit 65
 fi
 
 MOTIF_FILE=$1
 FASTA_DIR=$2
-BFILE_DIR=$3
-REGULATOR_NAME=$4
+REGULATOR_NAME=$3
 
 for i in $(ls $FASTA_DIR)
 do
 	org=$(echo $i | awk 'BEGIN { FS = "." } ; {print $1}')
-	mast $MOTIF_FILE $FASTA_DIR/$i -oc $org'_'$REGULATOR_NAME -bfile $BFILE_DIR/$org.ntfreq
-	mast $MOTIF_FILE $FASTA_DIR/$i -oc $org'_'$REGULATOR_NAME -bfile $BFILE_DIR/$org.ntfreq -hit_list > $org'_'$REGULATOR_NAME/hits.txt
+	mast $MOTIF_FILE $FASTA_DIR/$i -oc $org'_'$REGULATOR_NAME -comp
+	mast $MOTIF_FILE $FASTA_DIR/$i -oc $org'_'$REGULATOR_NAME -comp -hit_list > $org'_'$REGULATOR_NAME/hits.txt
 done
