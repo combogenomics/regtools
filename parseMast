@@ -149,6 +149,7 @@ if __name__ == "__main__":
                             i += 1
                         else:
                             print '\t'.join([str(x) for x in [gname,
+                                                  s.id,
                                                   m.start, m.stop,
                                                   strand, start, stop,
                                                   seq, 'mast',
@@ -178,6 +179,7 @@ if __name__ == "__main__":
                             i += 1
                         else:
                             print '\t'.join([str(x) for x in [gname,
+                                                  s.id,
                                                   m.start, m.stop,
                                                   strand, start, stop,
                                                   seq, 'mast',
