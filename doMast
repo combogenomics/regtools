@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Given a motif file (meme.txt) and a directory full of geneomes in fasta format
+# launches mast on each genome
+
 if [ "$#" -lt 3 ]; then
     echo 'doMast MOTIF_FILE FASTA_DIR REGULATOR_NAME'
     exit 65

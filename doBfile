@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Given a directory containing only fasta files, produces one
+# background file for each genome
+# Produces a 3-order Markov background
+
 if [ "$#" -lt 1 ]; then
     echo 'doBfile FASTA_DIR'
     exit 65

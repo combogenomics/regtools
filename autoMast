@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Automagic script to launch doMast on many regulators/genomes
+
 if [ "$#" -lt 2 ]; then
     echo 'autoMast MOTIF_DIR FASTA_DIR'
     exit 65
