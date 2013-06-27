@@ -52,6 +52,10 @@ def getOptions():
                     dest='all',
                     default=False,
                 help='Save ALL upstream regions (not considering genes overlaps and -u option)')
+    parser.add_argument('-r', '--header', action="store_true",
+                    dest='header',
+                    default=False,
+                help='Print explanatory header (incompatible with -f)')
     
     return parser.parse_args()
 
@@ -111,7 +115,17 @@ if __name__ == "__main__":
         hits[m.dna].add(m)
        
     i = 0
-        
+    
+    if options.header:
+        print '#' + '\t'.join([str(x) for x in ['locus_tag',
+                                          'dna_id', 'dna_strand',
+                                          'dna_start', 'dna_stop',
+                                          'motif_strand', 'motif_start',
+                                          'motif_stop',
+                                          'motif_seq', 'method',
+                                          'pvalue', 'threshold',
+                                          'regulator_name']])
+    
     for s in SeqIO.parse(open(options.genome), 'genbank'):
         if s.id not in hits:continue
         
@@ -131,9 +145,9 @@ if __name__ == "__main__":
                         if options.order and m.strand == '-':continue
                         
                         if m.strand == '-':
-                            strand = '1'
+                            strand = '-'
                         else:
-                            strand = '0'
+                            strand = '+'
                         
                         start = m.start - f.location.start
                         stop = m.stop - f.location.start
@@ -149,7 +163,7 @@ if __name__ == "__main__":
                             i += 1
                         else:
                             print '\t'.join([str(x) for x in [gname,
-                                                  s.id,
+                                                  s.id, m.strand,
                                                   m.start, m.stop,
                                                   strand, start, stop,
                                                   seq, 'mast',
@@ -161,9 +175,9 @@ if __name__ == "__main__":
                         if options.order and m.strand == '+':continue
                             
                         if m.strand == '+':
-                            strand = '1'
+                            strand = '-'
                         else:
-                            strand = '0'
+                            strand = '+'
                         
                         start = f.location.end - m.stop
                         stop = f.location.end - m.start
@@ -179,7 +193,7 @@ if __name__ == "__main__":
                             i += 1
                         else:
                             print '\t'.join([str(x) for x in [gname,
-                                                  s.id,
+                                                  s.id, m.strand,
                                                   m.start, m.stop,
                                                   strand, start, stop,
                                                   seq, 'mast',
