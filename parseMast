@@ -7,6 +7,7 @@ of a gene based on a GenBank file
 __author__ = "Marco Galardini"
 
 from Bio import SeqIO
+from regtools import *
 
 ################################################################################
 # Read options
@@ -34,8 +35,8 @@ def getOptions():
                         help='Upstream region size [Default: 100bp]')
     parser.add_argument('-t', '--threshold', action='store',
                         type=float,
-                        default=0.0001,
-                        help='p-value threshold [Default: 0.0001]')
+                        default=10,
+                        help='p-value threshold [Default: 10]')
     parser.add_argument('-o', '--order', action="store_true",
             default=False,
             dest='order',
@@ -44,6 +45,13 @@ def getOptions():
             default=False,
             dest='fasta',
             help='Output in FASTA format')
+    parser.add_argument('-l', '--linear', action="store_true",
+                            default=False,
+                        help='Linear or draft genome')
+    parser.add_argument('-a', '--all', action="store_true",
+                    dest='all',
+                    default=False,
+                help='Save ALL upstream regions (not considering genes overlaps and -u option)')
     
     return parser.parse_args()
 
@@ -63,7 +71,7 @@ class Mast(object):
 ################################################################################
 # Functions
 
-def parseMast(fname, threshold=0.0001):
+def parseMast(fname, threshold=10):
     '''
     Generator to relevant lines of a MAST output
     Returns Mast objects
@@ -78,6 +86,17 @@ def parseMast(fname, threshold=0.0001):
         if float(pvalue) > threshold:continue
         
         yield Mast(dna, strand, mname, start, stop, score, pvalue)
+        
+def getUpstreams(record, b_up=400, b_down=100, is_circ=True, all_up=False):
+    genes=get_genes(record)
+    if len(genes)==0:
+        return []
+    whole_seq=get_whole_genome_seq(record)
+    if not all_up:
+        upstreams=get_all_upstreams(genes,whole_seq, b_up, b_down, is_circ)
+    else:
+        upstreams=get_all_upstreams_all(genes,whole_seq, b_up, b_down, is_circ)
+    return upstreams
 
 ################################################################################
 # Main
@@ -96,11 +115,19 @@ if __name__ == "__main__":
     for s in SeqIO.parse(open(options.genome), 'genbank'):
         if s.id not in hits:continue
         
-        for m in hits[s.id]:
+        dups = {}
+        upstream = getUpstreams(s, options.upstream, options.downstream,
+                                not options.linear, options.all)
+        for u in upstream:
+            dups[u.name] = u
+        
+        for m in sorted(hits[s.id], key=lambda x: x.start):
             for f in filter(lambda x: x.type == 'CDS', s.features):
+                gname = f.qualifiers['locus_tag'][0]
+                
                 if f.strand == 1:
-                    if (m.start > (f.location.start - options.upstream) and
-                           m.stop < (f.location.start + options.downstream)):
+                    if (m.start > (dups[gname].start) and
+                           m.stop < (dups[gname].end)):
                         if options.order and m.strand == '-':continue
                         
                         if m.strand == '-':
@@ -121,14 +148,15 @@ if __name__ == "__main__":
                             print seq
                             i += 1
                         else:
-                            print '\t'.join([str(x) for x in [f.qualifiers['locus_tag'][0],
+                            print '\t'.join([str(x) for x in [gname,
+                                                  m.start, m.stop,
                                                   strand, start, stop,
                                                   seq, 'mast',
                                                   m.pvalue, options.threshold,
                                                   options.regulator]])
                 else:
-                    if (m.start > (f.location.end - options.downstream) and
-                           m.stop < (f.location.end + options.upstream)):
+                    if (m.start > (dups[gname].start) and
+                           m.stop < (dups[gname].end)):
                         if options.order and m.strand == '+':continue
                             
                         if m.strand == '+':
@@ -149,7 +177,8 @@ if __name__ == "__main__":
                             print seq
                             i += 1
                         else:
-                            print '\t'.join([str(x) for x in [f.qualifiers['locus_tag'][0],
+                            print '\t'.join([str(x) for x in [gname,
+                                                  m.start, m.stop,
                                                   strand, start, stop,
                                                   seq, 'mast',
                                                   m.pvalue, options.threshold,
