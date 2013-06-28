@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Given a motif file (meme.txt) and a directory full of genomes in fasta format
+# launches mast on each genome
+
+if [ "$#" -lt 6 ]; then
+    echo 'doRSAT MOTIF_FILE FASTA_DIR BFILE_DIR GENBANK_DIR RESULTS_DIR REGULATOR_NAME'
+    exit 65
+fi
+
+MOTIF_FILE=$1
+FASTA_DIR=$2
+BFILE_DIR=$3
+GENBANK_DIR=$4
+RESULTS_DIR=$5
+REGULATOR_NAME=$6
+
+for i in $(ls $FASTA_DIR)
+do
+	org=$(echo $i | awk 'BEGIN { FS = "." } ; {print $1}')
+	matrix-scan -m $MOTIF_FILE -matrix_format meme -i $FASTA_DIR/$i -bgfile $BFILE_DIR/$org.ntfreq -bg_format meme -return sites -o $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt -quick -n skip -uth pval 0.00001
+    ./parseRSAT -l -t 1e-5 -o $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_orientation.tab'
+	./parseRSAT -l -t 1e-5 $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_noorientation.tab'
+done
