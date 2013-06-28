@@ -120,7 +120,7 @@ if __name__ == "__main__":
     for l in open(options.motif):
         l=l.strip()
         if 'LENG  ' in l:
-            mLen=int(l.lstrip('LENG  ')))
+            mLen=int(l.lstrip('LENG  '))
 
     hits = {}
     for m in parseHMM(options.nhmmer, mLen, options.threshold):
