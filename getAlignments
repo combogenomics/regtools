@@ -1,0 +1,19 @@
+#!/usr/bin/python
+'''
+Takes a meme motif file and creates an alignment file
+'''
+import sys
+from Bio import motifs
+
+if len(sys.argv) < 3:
+    print 'getAlignments MOTIF_FILE ALIGNMENT_OUT'
+
+fmotif = sys.argv[1]
+fout = sys.argv[2]
+
+m = motifs.read(open(fmotif), 'meme')
+fout = open(fout, 'w')
+for i in m.instances:
+	fout.write('>align\n')
+	fout.write(str(i)+'\n')
+fout.close()

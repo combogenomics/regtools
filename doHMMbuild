@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Automagic script to create HMM files from meme motifs
+
+if [ "$#" -lt 1 ]; then
+    echo 'autoHMM MOTIF_DIR'
+    exit 65
+fi
+
+MOTIF_DIR=$1
+
+for reg in $(ls -d $MOTIF_DIR/*/)
+do
+    regulator=$(echo $reg | awk 'BEGIN {FS = "/"}; {print ( $(NF-1) )}')
+	for meme in $(ls -d $reg/*/)
+	do
+	    ./getAlignments $meme/meme.txt $meme/meme.fa
+	    hmmbuild --pnone $meme/meme.hmm $meme/meme.fa
+	done
+done
