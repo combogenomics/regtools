@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Given a motif file (meme.txt) and a directory full of geneomes in fasta format
+# Given a motif file (meme.txt) and a directory full of genomes in fasta format
 # launches mast on each genome
 
-if [ "$#" -lt 3 ]; then
-    echo 'doMast MOTIF_FILE FASTA_DIR REGULATOR_NAME'
+if [ "$#" -lt 5 ]; then
+    echo 'doMast MOTIF_FILE FASTA_DIR GENBANK_DIR RESULTS_DIR REGULATOR_NAME'
     exit 65
 fi
 
@@ -16,5 +16,6 @@ for i in $(ls $FASTA_DIR)
 do
 	org=$(echo $i | awk 'BEGIN { FS = "." } ; {print $1}')
 	mast $MOTIF_FILE $FASTA_DIR/$i -oc $org'_'$REGULATOR_NAME
-	mast $MOTIF_FILE $FASTA_DIR/$i -oc $org'_'$REGULATOR_NAME -hit_list > $org'_'$REGULATOR_NAME/hits.txt
+	mast $MOTIF_FILE $FASTA_DIR/$i -oc $org'_'$REGULATOR_NAME -hit_list > $org'_'$REGULATOR_NAME'/hits.txt'
+	./parseMast -t 1e-5  $org'_'$REGULATOR_NAME/hits.txt $GEBANK_DIR/$org.gbk $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'.tab'
 done
