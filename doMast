@@ -18,6 +18,6 @@ for i in $(ls $FASTA_DIR)
 do
 	org=$(echo $i | awk 'BEGIN { FS = "." } ; {print $1}')
 	mast $MOTIF_FILE $FASTA_DIR/$i -oc $RESULTS_DIR/$org'_'$REGULATOR_NAME
-	mast $MOTIF_FILE $FASTA_DIR/$i -oc $RESULTS_DIR/$org'_'$REGULATOR_NAME -hit_list > $org'_'$REGULATOR_NAME'/hits.txt'
+	mast $MOTIF_FILE $FASTA_DIR/$i -oc $RESULTS_DIR/$org'_'$REGULATOR_NAME -hit_list > $RESULTS_DIR/$org'_'$REGULATOR_NAME'/hits.txt'
 	./parseMast -t 1e-5  $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GEBANK_DIR/$org.gbk $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'.tab'
 done
