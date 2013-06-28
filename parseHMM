@@ -7,7 +7,6 @@ of a gene based on a GenBank file
 __author__ = "Marco Galardini"
 
 from Bio import SeqIO
-from Bio import motifs
 from regtools import *
 
 ################################################################################
@@ -118,10 +117,13 @@ if __name__ == "__main__":
     options = getOptions()
 
     # Read the input motif (we need to know its length)
-    m = motifs.read(open(options.motif), 'meme')
+    for l in open(options.motif):
+        l=l.strip()
+        if 'LENG  ' in l:
+            mLen=int(l.lstrip('LENG  ')))
 
     hits = {}
-    for m in parseHMM(options.nhmmer, m.length, options.threshold):
+    for m in parseHMM(options.nhmmer, mLen, options.threshold):
         if m.dna not in hits:
             hits[m.dna] = set()
         hits[m.dna].add(m)
