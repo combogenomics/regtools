@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Given a motif file (meme.txt) and a directory full of genomes in fasta format
-# launches mast on each genome
+# launches rsat on each genome
 
 if [ "$#" -lt 5 ]; then
     echo 'doRSAT MOTIF_FILE FASTA_DIR GENBANK_DIR RESULTS_DIR REGULATOR_NAME'
