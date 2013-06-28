@@ -9,6 +9,8 @@ fi
 
 MOTIF_DIR=$1
 FASTA_DIR=$2
+GENBANK_DIR=$3
+RESULTS_DIR=$4
 
 for reg in $(ls -d $MOTIF_DIR/*/)
 do
