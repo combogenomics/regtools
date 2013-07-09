@@ -1,0 +1,79 @@
+#!/usr/bin/python
+'''
+Perform a motif search on a complete genome, using BioPython
+Motif should be in MEME format
+'''
+
+__author__ = "Bianca Roncaglia"
+
+from Bio import motifs
+from Bio.Alphabet.IUPAC import unambiguous_dna
+from Bio import SeqIO
+from Bio.SeqUtils import GC
+
+################################################################################
+# Read options
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Perform a motif search on a complete genome, using BioPython; "+
+                    "motif should be in MEME format")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('motif', action="store",
+                            help='Motif file (MEME format)')
+    parser.add_argument('genome', action="store",
+                            help='Genome Fasta file')
+    
+    return parser.parse_args()
+
+################################################################################
+# Main
+
+if __name__ == "__main__":
+    options = getOptions()
+    
+    handle = open(options.motif)
+    record = motifs.parse(handle, "meme")
+    handle.close()
+    
+    # We assume that we have only one motif for each file
+    m = record[0]
+
+    # Provide the exact background
+    s1 = None
+    for s in SeqIO.parse(open(options.genome), 'fasta'):
+        if s1 is None:
+            s1 = s
+        else:
+            s1 += s
+    m.background = GC(s1.seq)/100
+    
+    # Pseudocounts to avoid overfitting
+    # Threshold as proposed in:
+    # "Pseudocounts for transcription factor binding sites
+    # Keishin Nishida, Martin C. Frith, and Kenta Nakai
+    # doi:  10.1093/nar/gkn1019
+    m.pseudocounts = 0.01
+    
+    # Define our scoere threshold
+    distribution = m.pssm.distribution()
+    score_t = distribution.threshold_fnr(0.1)
+    
+    pssm = m.pssm
+
+    # The actual search
+    for s in SeqIO.parse(open(options.genome), "fasta"):
+        s.seq.alphabet = unambiguous_dna
+        for position, score in pssm.search(s.seq, threshold=score_t):
+            if position < 0:
+                strand = '-1'
+                start = len(s) + position
+            else:
+                strand = '+1'
+                start = position
+            stop = start + len(m) - 1
+            
+            print '\t'.join([s.id, strand, str(start), str(stop), str(score)])
+

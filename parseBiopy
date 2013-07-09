@@ -1,0 +1,204 @@
+#!/usr/bin/python
+'''
+Read the tabular output of searchBiopy, and check which hits are in the upstream region
+of a gene based on a GenBank file
+'''
+
+__author__ = "Marco Galardini"
+
+from Bio import SeqIO
+from regtools import *
+
+################################################################################
+# Read options
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Parse the tabular output of searchBiopy and a GenBank file, "+
+                    "providing the list of hits found in gene upstream regions")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('biopy', action="store",
+                            help='searchBiopy tabular file')
+    parser.add_argument('genome', action="store",
+                            help='Genome GenBank file')
+    parser.add_argument('regulator', action="store",
+                            help='Regulator name')
+    parser.add_argument('-u', '--upstream', action='store',
+                        type=int,
+                        default=400,
+                        help='Upstream region size [Default: 400bp]')
+    parser.add_argument('-d', '--downstream', action='store',
+                        type=int,
+                        default=100,
+                        help='Upstream region size [Default: 100bp]')
+    parser.add_argument('-t', '--threshold', action='store',
+                        type=float,
+                        default=100,
+                        help='score threshold [Default: 100]')
+    parser.add_argument('-o', '--order', action="store_true",
+            default=False,
+            dest='order',
+            help='The motif has to be found in forward with the gene (not for palindromic motifs)')
+    parser.add_argument('-f', '--fasta', action="store_true",
+            default=False,
+            dest='fasta',
+            help='Output in FASTA format')
+    parser.add_argument('-l', '--linear', action="store_true",
+                            default=False,
+                        help='Linear or draft genome')
+    parser.add_argument('-a', '--all', action="store_true",
+                    dest='all',
+                    default=False,
+                help='Save ALL upstream regions (not considering genes overlaps and -u option)')
+    parser.add_argument('-r', '--header', action="store_true",
+                    dest='header',
+                    default=False,
+                help='Print explanatory header (incompatible with -f)')
+    
+    return parser.parse_args()
+
+################################################################################
+# Classes
+
+class BIOPY(object):
+    def __init__(self, dna, strand, mname, start, stop, score):
+        self.dna = dna
+        self.strand = strand
+        self.mname = mname
+        self.start = int(start)
+        self.stop = int(stop)
+        self.score = float(score)
+
+################################################################################
+# Functions
+
+def parseBiopy(fname, threshold=100):
+    '''
+    Generator to relevant lines of a searchBiopy output
+    Returns BIOPY objects
+    '''
+    for l in open(fname):
+        if l.lstrip().startswith('#'):continue
+        
+        dna, strand, start, stop, score = l.strip().split('\t')
+        
+        if strand == '+1':
+            strand = '+'
+        else:
+            strand = '-'
+        if float(score) > threshold:continue
+        
+        yield BIOPY(dna, strand, dna, start, stop, score)
+        
+def getUpstreams(record, b_up=400, b_down=100, is_circ=True, all_up=False):
+    genes=get_genes(record)
+    if len(genes)==0:
+        return []
+    whole_seq=get_whole_genome_seq(record)
+    if not all_up:
+        upstreams=get_all_upstreams(genes,whole_seq, b_up, b_down, is_circ)
+    else:
+        upstreams=get_all_upstreams_all(genes,whole_seq, b_up, b_down, is_circ)
+    return upstreams
+
+################################################################################
+# Main
+
+if __name__ == "__main__":
+    options = getOptions()
+
+    hits = {}
+    for m in parseBiopy(options.biopy, options.threshold):
+        if m.dna not in hits:
+            hits[m.dna] = set()
+        hits[m.dna].add(m)
+       
+    i = 0
+    
+    if options.header:
+        print '#' + '\t'.join([str(x) for x in ['locus_tag',
+                                          'dna_id', 'dna_strand',
+                                          'dna_start', 'dna_stop',
+                                          'motif_strand', 'motif_start',
+                                          'motif_stop',
+                                          'motif_seq', 'method',
+                                          'score', 'threshold',
+                                          'regulator_name']])
+    
+    for s in SeqIO.parse(open(options.genome), 'genbank'):
+        if s.id not in hits:continue
+        
+        dups = {}
+        upstream = getUpstreams(s, options.upstream, options.downstream,
+                                not options.linear, options.all)
+        for u in upstream:
+            dups[u.name] = u
+        
+        for m in sorted(hits[s.id], key=lambda x: x.start):
+            for f in filter(lambda x: x.type == 'CDS', s.features):
+                gname = f.qualifiers['locus_tag'][0]
+                
+                if f.strand == 1:
+                    if (m.start > (dups[gname].start) and
+                           m.stop < (dups[gname].end)):
+                        if options.order and m.strand == '-':continue
+                        
+                        if m.strand == '-':
+                            strand = '-'
+                        else:
+                            strand = '+'
+                        
+                        start = m.start - f.location.start
+                        stop = m.stop - f.location.start
+                        
+                        if m.strand == '+':
+                            seq = s[m.start  -1:m.stop ].seq
+                        else:
+                            seq = s[m.start  -1:m.stop ].seq.reverse_complement()
+                        
+                        if options.fasta:
+                            print '>%d'%i
+                            print seq
+                            i += 1
+                        else:
+                            print '\t'.join([str(x) for x in [gname,
+                                                  s.id, m.strand,
+                                                  m.start, m.stop,
+                                                  strand, start, stop,
+                                                  seq, 'biopy',
+                                                  m.score, options.threshold,
+                                                  options.regulator]])
+                else:
+                    if (m.start > (dups[gname].start) and
+                           m.stop < (dups[gname].end)):
+                        if options.order and m.strand == '+':continue
+                            
+                        if m.strand == '+':
+                            strand = '-'
+                        else:
+                            strand = '+'
+                        
+                        start = f.location.end - m.stop
+                        stop = f.location.end - m.start
+                        
+                        if m.strand == '+':
+                            seq = s[m.start  -1:m.stop ].seq
+                        else:
+                            seq = s[m.start  -1:m.stop ].seq.reverse_complement()
+                        
+                        if options.fasta:
+                            print '>%d'%i
+                            print seq
+                            i += 1
+                        else:
+                            print '\t'.join([str(x) for x in [gname,
+                                                  s.id, m.strand,
+                                                  m.start, m.stop,
+                                                  strand, start, stop,
+                                                  seq, 'biopy',
+                                                  m.score, options.threshold,
+                                                  options.regulator]])
+        
+    

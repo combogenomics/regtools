@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Automagic script to launch doBiopy on many regulators/genomes
+
+if [ "$#" -lt 4 ]; then
+    echo 'autoMast MOTIF_DIR FASTA_DIR GENBANK_DIR RESULTS_DIR'
+    exit 65
+fi
+
+MOTIF_DIR=$1
+FASTA_DIR=$2
+GENBANK_DIR=$3
+RESULTS_DIR=$4
+
+for reg in $(ls -d $MOTIF_DIR/*/)
+do
+    count=0
+    regulator=$(echo $reg | awk 'BEGIN {FS = "/"}; {print ( $(NF-1) )}')
+	for meme in $(ls -d $reg/*/)
+	do
+	    let "count += 1"
+	    ./doBiopy $meme/meme.txt $FASTA_DIR $GENBANK_DIR $RESULTS_DIR $regulator'_'$count
+	done
+done
