@@ -33,10 +33,6 @@ def getOptions():
                         type=int,
                         default=100,
                         help='Upstream region size [Default: 100bp]')
-    parser.add_argument('-t', '--threshold', action='store',
-                        type=float,
-                        default=100,
-                        help='score threshold [Default: 100]')
     parser.add_argument('-o', '--order', action="store_true",
             default=False,
             dest='order',
@@ -63,18 +59,19 @@ def getOptions():
 # Classes
 
 class BIOPY(object):
-    def __init__(self, dna, strand, mname, start, stop, score):
+    def __init__(self, dna, strand, mname, start, stop, score, score_t):
         self.dna = dna
         self.strand = strand
         self.mname = mname
         self.start = int(start)
         self.stop = int(stop)
         self.score = float(score)
+        self.score_t = float(score_t)
 
 ################################################################################
 # Functions
 
-def parseBiopy(fname, threshold=100):
+def parseBiopy(fname):
     '''
     Generator to relevant lines of a searchBiopy output
     Returns BIOPY objects
@@ -82,15 +79,14 @@ def parseBiopy(fname, threshold=100):
     for l in open(fname):
         if l.lstrip().startswith('#'):continue
         
-        dna, strand, start, stop, score = l.strip().split('\t')
+        dna, strand, start, stop, score, score_t = l.strip().split('\t')
         
         if strand == '+1':
             strand = '+'
         else:
             strand = '-'
-        if float(score) > threshold:continue
         
-        yield BIOPY(dna, strand, dna, start, stop, score)
+        yield BIOPY(dna, strand, dna, start, stop, score, score_t)
         
 def getUpstreams(record, b_up=400, b_down=100, is_circ=True, all_up=False):
     genes=get_genes(record)
@@ -110,7 +106,7 @@ if __name__ == "__main__":
     options = getOptions()
 
     hits = {}
-    for m in parseBiopy(options.biopy, options.threshold):
+    for m in parseBiopy(options.biopy):
         if m.dna not in hits:
             hits[m.dna] = set()
         hits[m.dna].add(m)
@@ -168,7 +164,7 @@ if __name__ == "__main__":
                                                   m.start, m.stop,
                                                   strand, start, stop,
                                                   seq, 'biopy',
-                                                  m.score, options.threshold,
+                                                  m.score, m.score_t,
                                                   options.regulator]])
                 else:
                     if (m.start > (dups[gname].start) and
@@ -198,7 +194,7 @@ if __name__ == "__main__":
                                                   m.start, m.stop,
                                                   strand, start, stop,
                                                   seq, 'biopy',
-                                                  m.score, options.threshold,
+                                                  m.score, m.score_t,
                                                   options.regulator]])
         
     

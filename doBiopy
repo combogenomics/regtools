@@ -18,7 +18,7 @@ for i in $(ls $FASTA_DIR)
 do
 	org=$(echo $i | awk 'BEGIN { FS = "." } ; {print $1}')
 	mkdir $RESULTS_DIR/$org'_'$REGULATOR_NAME > /dev/null
-	./searchBiopy $MOTIF_FILE $FASTA_DIR/$i > $RESULTS_DIR/$org'_'$REGULATOR_NAME'/hits.txt'
+	./searchBiopy -n 7 $MOTIF_FILE $FASTA_DIR/$i > $RESULTS_DIR/$org'_'$REGULATOR_NAME'/hits.txt'
 
 	./parseBiopy -l -o $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_orientation.tab'
 	./parseBiopy -l $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_noorientation.tab'
