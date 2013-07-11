@@ -1,0 +1,459 @@
+#!/usr/bin/python
+'''
+Perform a motif search on a complete genome, using BioPython
+Motif should be in MEME format
+'''
+
+__author__ = "Bianca Roncaglia"
+
+from Bio import motifs
+from Bio.Alphabet.IUPAC import unambiguous_dna
+from Bio import SeqIO
+from Bio.SeqUtils import GC
+import sys
+import os
+import threading
+import Queue
+import time
+import multiprocessing
+from multiprocessing import queues
+
+################################################################################
+# Read options
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Perform a motif search on a complete genome, using BioPython; "+
+                    "motif should be in MEME format")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('motif', action="store",
+                            help='Motif file (MEME format)')
+    parser.add_argument('motifname', action="store",
+                            help='Motif name')
+    parser.add_argument('genomedir', action="store",
+                            help='Genome Fasta directory')
+    parser.add_argument('resultsdir', action="store",
+                            help='Results directory')
+    
+    parser.add_argument('-n', metavar='cpu', action="store", dest='cpu',
+                            type=int,
+                            default=1,
+                            help='Number of CPUs to be used')
+    
+    return parser.parse_args()
+
+################################################################################
+# Classes
+
+class Status(object):
+    '''
+    Class Status
+    Gives informations about the run status of a specific thread
+    '''
+    def __init__(self,status=None,msg=None,maxstatus=None,
+                    substatus=None,submsg=None,maxsubstatus=None,
+                    fail=False):
+        self.status = status
+        self.msg = msg
+        self.maxstatus = maxstatus
+        #
+        self.substatus = substatus
+        self.submsg = submsg
+        self.maxsubstatus = maxsubstatus
+        # Fail msg?
+        self.fail = fail
+
+class CommonThread(threading.Thread):
+    '''
+    Class CommonThread: Common operations for a threading class
+    '''
+    _statusDesc = {0:'Not started',
+               1:'Making room', 
+               3:'Cleaning up'}
+    
+    _substatuses = []
+    
+    def __init__(self,queue=Queue.Queue()):
+        threading.Thread.__init__(self)
+        # Thread
+        self.msg = queue
+        self._status = 0
+        self._maxstatus = len(self._statusDesc)
+        self._substatus = 0
+        self._maxsubstatus = 0
+        self._room = None
+        self.killed = False
+        
+    def getStatus(self):
+        return self._statusDesc[self._status]
+    
+    def getMaxStatus(self):
+        return self._maxstatus
+    
+    def getMaxSubStatus(self):
+        return self._maxsubstatus
+    
+    def getSubStatuses(self):
+        return self._substatuses
+    
+    def resetSubStatus(self):
+        self._substatus = 0
+        self._maxsubstatus = 0
+        
+    def makeRoom(self,location=''):
+        '''
+        Creates a tmp directory in the desired location
+        '''
+        try:
+            path = os.path.abspath(location)
+            path = os.path.join(path, 'tmp')
+            self._room = path
+            os.mkdir(path)
+        except:
+            logger.debug('Temporary directory creation failed! %s'
+                          %path)
+    
+    def startCleanUp(self):
+        '''
+        Removes the temporary directory
+        '''
+        if os.path.exists(self._room):
+            logger.debug('Removing the old results directory (%s)'%
+                         self._room)
+            shutil.rmtree(self._room, True)
+    
+    def cleanUp(self):
+        '''
+        Removes the temporary directory
+        '''
+        shutil.rmtree(self._room, True)
+        
+    def run(self):
+        self.updateStatus()
+        self.makeRoom()
+
+        self.updateStatus()
+        self.cleanUp()
+            
+    def sendFailure(self,detail='Error!'):
+        msg = Status(fail=True,
+                     msg=detail)
+        self.msg.put(msg)
+        # Give some time for the message to arrive
+        time.sleep(0.1)
+        
+    def updateStatus(self,sub=False,send=True):
+        if not sub:
+            self._status += 1
+        if not send:
+            return
+        if self._status in self._substatuses:
+            msg = Status(status=self._status,msg=self.getStatus(),
+                         maxstatus=self.getMaxStatus(),
+                         substatus=self._substatus,
+                         maxsubstatus=self.getMaxSubStatus())
+        else:
+            msg = Status(status=self._status,msg=self.getStatus(),
+                         maxstatus=self.getMaxStatus())
+        self.msg.put(msg)
+        
+    def kill(self):
+        self.killed = True
+
+class SafeSleep(object):
+    '''
+    IOError safe sleep
+    '''
+    def sleep(self,seconds):
+        '''
+        Sleeps for a certain amount of seconds
+        Raises an exception if too many errors are encountered
+        '''
+        dt = 1e-3
+        while dt < 1:
+            try:
+                time.sleep(seconds)
+                return
+            except IOError:
+                logger.warning('IOError encountered in SafeSleep sleep()')
+                try:
+                    time.sleep(dt)
+                except:pass
+                dt *= 2
+                
+        e = IOError('Unrecoverable error')
+        raise e
+
+class SafeQueue(queues.Queue):
+    '''
+    IOError safe multiprocessing Queue
+    '''
+    def __init__(self):
+        queues.Queue.__init__(self)
+        
+    def empty(self):
+        '''
+        Returns True if the Queue is empty, False otherwise
+        Raises an exception if too many errors are encountered 
+        '''
+        dt = 1e-3
+        while dt < 1:
+            try:
+                isEmpty = queues.Queue.empty(self)
+                return isEmpty
+            except IOError:
+                logger.warning('IOError encountered in SafeQueue empty()')
+                try:
+                    time.sleep(dt)
+                except:pass
+                dt *= 2
+                
+        e = IOError('Unrecoverable error')
+        raise e
+
+    def get(self):
+        '''
+        Get the element in the queue
+        Raises an exception if it's empty or if too many errors are
+        encountered
+        '''
+        dt = 1e-3
+        while dt < 1:
+            try:
+                element = queues.Queue.get(self)
+                return element
+            except IOError:
+                logger.warning('IOError encountered in SafeQueue get()')
+                try:
+                    time.sleep(dt)
+                except:pass
+                dt *= 2
+                
+        e = IOError('Unrecoverable error')
+        raise e
+    
+    def put(self,element):
+        '''
+        Put the element in the queue
+        Raises an exception if too many errors are
+        encountered
+        '''
+        dt = 1e-3
+        while dt < 1:
+            try:
+                queues.Queue.put(self,element)
+                return
+            except IOError:
+                logger.warning('IOError encountered in SafeQueue put()')
+                try:
+                    time.sleep(dt)
+                except:pass
+                dt *= 2
+                
+        e = IOError('Unrecoverable error')
+        raise e
+
+class Consumer(multiprocessing.Process):    
+    def __init__(self, 
+                 task_queue = multiprocessing.Queue(),
+                 result_queue = multiprocessing.Queue()):
+        multiprocessing.Process.__init__(self)
+        self.task_queue = task_queue
+        self.result_queue = result_queue
+        self.sleeper = SafeSleep()
+
+    def run(self):
+        while True:
+            next_task = self.task_queue.get()
+            self.sleeper.sleep(0.01)
+            if next_task is None:
+                # Poison pill means we should exit
+                break
+            answer = next_task()
+            self.result_queue.put(answer)
+        return
+
+class CommonMultiProcess(CommonThread):
+    '''
+    Class CommonMultiProcess
+    A Thread that can perform multiprocesses
+    '''
+    def __init__(self,ncpus=1, queue=queues.Queue()):
+        CommonThread.__init__(self,queue)
+        
+        self.ncpus = int(ncpus)
+        # Parallelization
+        self._parallel = None
+        self._paralleltasks = SafeQueue()
+        self._parallelresults = SafeQueue()
+        self.sleeper = SafeSleep()
+        
+        # ID
+        self._unique = 0
+        
+    def getUniqueID(self):
+        self._unique += 1
+        return self._unique
+    
+    def initiateParallel(self):
+        self._parallel = [Consumer(self._paralleltasks,self._parallelresults)
+                          for x in range(self.ncpus)]
+        for consumer in self._parallel:
+            consumer.start()
+            
+    def addPoison(self):
+        for consumer in self._parallel:
+            self._paralleltasks.put(None)
+
+    def isTerminated(self):
+        for consumer in self._parallel:
+            if consumer.is_alive():
+                return False
+        return True
+
+    def killParallel(self):
+        for consumer in self._parallel:
+            consumer.terminate()
+
+class SearchMotif(object):
+    def __init__(self, motiffile, seqfile):
+        self.motiffile = motiffile
+        self.seqfile = seqfile
+    
+    def __call__(self):
+        handle = open(self.motiffile)
+        record = motifs.parse(handle, "meme")
+        handle.close()
+        
+        # We assume that we have only one motif for each file
+        m = record[0]
+
+        # Provide the exact background
+        s1 = None
+        for s in SeqIO.parse(open(self.seqfile), 'fasta'):
+            if s1 is None:
+                s1 = s
+            else:
+                s1 += s
+        m.background = GC(s1.seq)/100
+        
+        # Pseudocounts to avoid overfitting
+        # Threshold as proposed in:
+        # "Pseudocounts for transcription factor binding sites
+        # Keishin Nishida, Martin C. Frith, and Kenta Nakai
+        # doi:  10.1093/nar/gkn1019
+        m.pseudocounts = 0.01
+        
+        # Define our scoere threshold
+        distribution = m.pssm.distribution()
+        score_t = distribution.threshold_fnr(0.1)
+        
+        pssm = m.pssm
+    
+        hits = []
+        
+        for s in SeqIO.parse(self.seqfile, 'fasta'):        
+            s.seq.alphabet = unambiguous_dna
+            pssm.alphabet = unambiguous_dna
+            
+            for position, score in pssm.search(s.seq, threshold=score_t):
+                if position < 0:
+                    strand = '-1'
+                    start = len(s) + position
+                else:
+                    strand = '+1'
+                    start = position
+                stop = start + len(m) - 1
+                
+                hits.append('\t'.join([s.id, strand, str(start), str(stop),
+                                    str(score), str(score_t)]))
+            
+        return (os.path.split(self.seqfile)[-1].split('.')[0], hits)
+
+class ParallelMotifSearch(CommonMultiProcess):
+    '''
+    Class ParallelMotifSearch
+    '''
+    def __init__(self, motiffile, genomedir, motifname, resultsdir,
+                 ncpus=1,queue=Queue.Queue()):
+        CommonMultiProcess.__init__(self,ncpus,queue)
+        
+        # Motif
+        self.motiffile = motiffile
+        
+        # Motif name
+        self.motifname = motifname
+        
+        # Genome dir
+        self.genomedir = genomedir
+    
+        # Results dir
+        self.resultsdir = resultsdir
+    
+    def analyzeMotifs(self):
+        self.initiateParallel()
+        
+        for f in os.listdir(self.genomedir):
+            # Multi process
+            obj = SearchMotif(self.motiffile, os.path.join(self.genomedir, f))
+            self._paralleltasks.put(obj)
+                
+        # Poison pill to stop the workers
+        self.addPoison()
+        
+        while True:
+            while not self._parallelresults.empty():
+                genome, hits = self._parallelresults.get()
+                
+                fname = os.path.join(self.resultsdir, '%s_%s'%(genome,
+                                                              self.motifname),
+                                    'hits.txt')
+                fout = open(fname, 'w')
+                for h in hits:
+                    fout.write(h+'\n')
+                fout.close()
+                
+                print genome, self.motifname
+                    
+            if self.isTerminated():
+                break
+            
+            self.sleeper.sleep(0.1)
+            
+        while not self._parallelresults.empty():
+                genome, hits = self._parallelresults.get()
+                
+                fname = os.path.join(self.resultsdir, '%s_%s'%(genome,
+                                                              self.motifname),
+                                    'hits.txt')
+                fout = open(fname, 'w')
+                for h in hits:
+                    fout.write(h+'\n')
+                fout.close()
+                
+                print genome, self.motifname
+        
+        self.killParallel()
+    
+    def run(self):
+        self.analyzeMotifs()
+
+################################################################################
+# Main
+
+if __name__ == "__main__":
+    options = getOptions()
+
+    search = ParallelMotifSearch(options.motif, options.genomedir,
+                                options.motifname,
+                                options.resultsdir,
+                                options.cpu)
+    search.start()
+    while True:
+        time.sleep(0.5)
+        
+        if not search.isAlive():
+            break
+
