@@ -27,6 +27,10 @@ def getOptions():
                             help='MEME motif file')
     parser.add_argument('regulator', action="store",
                             help='Regulator name')
+    parser.add_argument('-m', '--maxup', action='store',
+                        type=int,
+                        default=600,
+                        help='Max upstream location [Default: 600bp]')
     parser.add_argument('-u', '--upstream', action='store',
                         type=int,
                         default=400,
@@ -171,6 +175,9 @@ if __name__ == "__main__":
                         start = m.start - f.location.start
                         stop = m.stop - f.location.start
                         
+                        # Discard those hits that are very far from the gene
+                        if start < -(options.maxup):continue
+                        
                         if m.strand == '+':
                             seq = s[m.start  -1:m.stop ].seq
                         else:
@@ -200,6 +207,9 @@ if __name__ == "__main__":
                         
                         start = f.location.end - m.stop
                         stop = f.location.end - m.start
+                        
+                        # Discard those hits that are very far from the gene
+                        if start < -(options.maxup):continue
                         
                         if m.strand == '+':
                             seq = s[m.start  -1:m.stop ].seq
