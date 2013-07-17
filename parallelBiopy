@@ -361,10 +361,10 @@ class SearchMotif(object):
             for position, score in pssm.search(s.seq, threshold=score_t):
                 if position < 0:
                     strand = '-1'
-                    start = len(s) + position
+                    start = len(s) + position + 1
                 else:
                     strand = '+1'
-                    start = position
+                    start = position + 1
                 stop = start + len(m) - 1
                 
                 hits.append('\t'.join([s.id, strand, str(start), str(stop),
