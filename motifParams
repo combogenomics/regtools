@@ -1,0 +1,89 @@
+#! /usr/bin/python
+'''
+From a motif (in MEME format) and a genome (in both fasta or DB), extract a bunch
+of usefull parameters
+'''
+from Bio import SeqIO
+from Bio import motifs
+from Bio.SeqUtils import GC
+import numpy as np
+import sys
+import os
+
+__author__ = "Marco Galardini"
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("From a motif (in MEME format) and a genome (in both fasta or DB), extract a bunch of usefull parameters")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('motif', action="store",
+                            help='Motif MEME file')
+    parser.add_argument('dna', action="store",
+                            help='Genome FASTA file')
+    parser.add_argument('-r', '--header', action="store_true",
+                    dest='header',
+                    default=False,
+                help='Print explanatory header')
+    
+    return parser.parse_args()
+
+def motifParams(opt):
+    # Read the input DNA
+    genome = None
+    for s in SeqIO.parse(open(opt.dna), 'fasta'):
+        if not genome:
+            genome = s
+        else:
+            genome += s
+    
+    # Imin
+    Imin = np.log2(len(genome))
+    
+    # Calculate frequencies on the genome
+    gc = GC(genome.seq) / 100
+    dfreq = {'A':(1-gc)/2,
+             'T':(1-gc)/2,
+             'G':gc/2,
+             'C':gc/2}
+
+    # Read the motif file and build the frequency list
+    mfreq = []
+    m = motifs.parse(open(opt.motif), 'meme')[0]
+    for i in range(len(m)):
+        fdict = {'A':m.pwm['A'][i],
+                 'C':m.pwm['C'][i],
+                 'G':m.pwm['G'][i],
+                 'T':m.pwm['T'][i]}
+        mfreq.append( fdict )
+    
+    # Calculate I
+    I = 0.0
+    for pos in mfreq:
+        for base in dfreq:
+            if pos[base] == 0:continue
+            I += pos[base] * np.log2( pos[base] / dfreq[base] )
+    
+    # Hit probability
+    Iprob = np.power(2, -I)
+    
+    # Spacing between hits
+    Ispace = 1 / Iprob
+    
+    # Expected Hits
+    Iexp = len(genome) * Iprob
+    
+    if opt.header:
+        print '\t'.join(['genome', 'length', 'GC', 'Imin', 'I', 'Iprob', 'Ispace', 'Iexp'])
+    print '\t'.join( [str(x) for x in [opt.dna.split('/')[-1].split('.')[0], len(genome),
+                                       GC(genome.seq), Imin, I, Iprob,
+                                       Ispace, Iexp]] )
+
+def main():
+    options = getOptions()
+    
+    motifParams(options)
+        
+if __name__ == '__main__':
+    main()
