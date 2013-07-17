@@ -19,7 +19,7 @@ do
 	org=$(echo $i | awk 'BEGIN { FS = "." } ; {print $1}')
 	mkdir $RESULTS_DIR/$org'_'$REGULATOR_NAME > /dev/null
 
-    nhmmer --max --tblout $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $MOTIF_FILE $FASTA_DIR/$i > /dev/null
+    nhmmer --max -E 100 --tblout $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $MOTIF_FILE $FASTA_DIR/$i > /dev/null
 
 	./parseHMM -l -o $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $MOTIF_FILE $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_orientation.tab'
 	./parseHMM -l $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $MOTIF_FILE $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_noorientation.tab'
