@@ -92,9 +92,17 @@ def parseHMM(fname, motifLen, threshold=10):
         l = l.strip()
         while '  ' in l:
             l=l.replace('  ', ' ')
-        
-        (dna, x1,x2,x3, hmmfrom, hmmto, start, stop,
-        x4,x5,x6, strand, evalue, score, x7,x8) = l.split()
+     
+        s = l.split()
+
+        dna = s[0]
+        hmmfrom = s[4]
+        hmmto = s[5]
+        start = s[6]
+        stop = s[7]
+        strand = s[11]
+        evalue = s[12]
+        score = s[13]
         
         start, stop = sorted([int(start), int(stop)])
 
@@ -143,22 +151,20 @@ if __name__ == "__main__":
                                           'motif_seq', 'method',
                                           'evalue', 'threshold',
                                           'regulator_name']])
-    
+  
     for s in SeqIO.parse(open(options.genome), 'genbank'):
         if s.id not in hits:
-            # NHMMer trims the '.1' from the id of complete genomes
-            # We assume that every sequence is at its first version
-            if s.id.rstrip('.1') not in hits:
-                continue
-            # End of the ugly exception
-        
+            continue
+      
         dups = {}
         upstream = getUpstreams(s, options.upstream, options.downstream,
                                 not options.linear, options.all)
         for u in upstream:
             dups[u.name] = u
         
-        for m in sorted(hits[s.id.rstrip('.1')], key=lambda x: x.start):
+        hs = sorted(hits[s.id], key=lambda x: x.start)
+       
+        for m in hs:
             for f in filter(lambda x: x.type == 'CDS', s.features):
                 gname = f.qualifiers['locus_tag'][0]
                 
