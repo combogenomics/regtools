@@ -25,7 +25,7 @@ def export_upstreams(upstreams,nome_out,infos):
         upstream = -(size-b_down)
         if upstream > 0:
             upstream=0
-        to_write='>%s; upstream from %s to %s; size: %s; feature type: cds; location:%s:%s:%s:%s:%s\n' %(name,upstream,b_down,size,organism,molecule,start,end,strand)
+        to_write='>%s upstream from %s to %s; size: %s; feature type: cds; location:%s:%s:%s:%s:%s\n' %(name,upstream,b_down,size,organism,molecule,start,end,strand)
         seq=nice_write(up.seq)
         out.write(to_write)
         out.write(seq)
