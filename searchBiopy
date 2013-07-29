@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/pypy
 '''
 Perform a motif search on a complete genome, using BioPython
 Motif should be in MEME format
@@ -419,14 +419,14 @@ if __name__ == "__main__":
     
     # Define our scoere threshold
     distribution = m.pssm.distribution()
-    score_t = distribution.threshold_fnr(0.1)
+    score_t = distribution.threshold_fnr(0.005)
     
     pssm = m.pssm
 
     search = ParallelMotifSearch(pssm, options.genome, score_t, options.cpu)
     search.start()
     while True:
-        time.sleep(0.5)
+        time.sleep(0.1)
         
         if not search.isAlive():
             break

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Automagic script to launch doBiopy on many regulators/genomes
+# Automagic script to launch doParallelBiopy on many regulators/genomes
 
 if [ "$#" -lt 4 ]; then
-    echo 'autoMast MOTIF_DIR FASTA_DIR GENBANK_DIR RESULTS_DIR'
+    echo 'autoParallelBiopy MOTIF_DIR FASTA_DIR GENBANK_DIR RESULTS_DIR'
     exit 65
 fi
 
