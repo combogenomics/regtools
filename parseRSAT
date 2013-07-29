@@ -94,6 +94,7 @@ def parseRSAT(fname, threshold=10):
             strand = '+'
         else:
             strand = '-'
+
         if float(pvalue) > threshold:continue
         
         yield RSAT(dna, strand, dna, start, stop, score, pvalue)
@@ -134,7 +135,8 @@ if __name__ == "__main__":
                                           'regulator_name']])
     
     for s in SeqIO.parse(open(options.genome), 'genbank'):
-        if s.id not in hits:continue
+        if s.id not in hits:
+            continue
         
         dups = {}
         upstream = getUpstreams(s, options.upstream, options.downstream,
