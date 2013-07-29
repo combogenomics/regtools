@@ -107,7 +107,7 @@ def parseHMM(fname, motifLen, threshold=10):
         start, stop = sorted([int(start), int(stop)])
 
         if float(evalue) > threshold:continue
-        if int(hmmto) - int(hmmfrom) + 1 != motifLen:continue
+        #if int(hmmto) - int(hmmfrom) + 1 != motifLen:continue
         
         yield HMM(dna, strand, dna, start, stop, score, evalue)
         
