@@ -140,6 +140,7 @@ if __name__ == "__main__":
             dups[u.name] = u
         
         for m in sorted(hits[s.id], key=lambda x: x.start):
+            bFound = False
             for f in filter(lambda x: x.type == 'CDS', s.features):
                 gname = f.qualifiers['locus_tag'][0]
                 
@@ -147,6 +148,8 @@ if __name__ == "__main__":
                     if (m.start > (dups[gname].start) and
                            m.stop < (dups[gname].end)):
                         if options.order and m.strand == '-':continue
+                        
+                        bFound = True
                         
                         if m.strand == '-':
                             strand = '-'
@@ -181,6 +184,8 @@ if __name__ == "__main__":
                            m.stop < (dups[gname].end)):
                         if options.order and m.strand == '+':continue
                             
+                        bFound = True
+                            
                         if m.strand == '+':
                             strand = '-'
                         else:
@@ -210,4 +215,22 @@ if __name__ == "__main__":
                                                   m.pvalue, options.threshold,
                                                   options.regulator]])
         
-    
+            if not bFound:
+                # Not in front of a gene, print a "naked" record
+                if m.strand == '+':
+                    seq = s[m.start  -1:m.stop ].seq
+                else:
+                    seq = s[m.start  -1:m.stop ].seq.reverse_complement()
+                    
+                if options.fasta:
+                    print '>%d'%i
+                    print seq
+                    i += 1
+                else:
+                    print '\t'.join([str(x) for x in ['',
+                                          s.id, m.strand,
+                                          m.start, m.stop,
+                                          '', '', '',
+                                          seq, 'mast',
+                                          m.pvalue, options.threshold,
+                                          options.regulator]])
