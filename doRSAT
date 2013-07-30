@@ -18,7 +18,7 @@ for i in $(ls $FASTA_DIR)
 do
 	org=$(echo $i | awk 'BEGIN { FS = "." } ; {print $1}')
 	mkdir $RESULTS_DIR/$org'_'$REGULATOR_NAME > /dev/null
-	matrix-scan -m $MOTIF_FILE -matrix_format meme -i $FASTA_DIR/$i -bginput -markov 3 -return sites -o $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt -quick -n skip -uth pval 0.01 -pseudo 0.01
-	./parseRSAT -l -t 0.01 -o $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_orientation.tab'
-	./parseRSAT -l -t 0.01 $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_noorientation.tab'
+	matrix-scan -m $MOTIF_FILE -matrix_format meme -i $FASTA_DIR/$i -bginput -markov 3 -return sites -o $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt -quick -n skip -uth pval 0.001 -pseudo 0.01
+	./parseRSAT -l -t 0.001 -o $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_orientation.tab'
+	./parseRSAT -l -t 0.001 $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_noorientation.tab'
 done
