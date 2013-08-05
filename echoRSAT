@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Automagic script to create a makefile for RSAT
+
+if [ "$#" -lt 4 ]; then
+	echo 'echoRSAT MOTIF_DIR FASTA_DIR GENBANK_DIR RESULTS_DIR'
+	exit 65
+fi
+
+MOTIF_DIR=$1
+FASTA_DIR=$2
+GENBANK_DIR=$3
+RESULTS_DIR=$4
+
+JOBN=0
+
+for reg in $(ls -d $MOTIF_DIR/*/)
+do
+	count=0
+	regulator=$(echo $reg | awk 'BEGIN {FS = "/"}; {print ( $(NF-1) )}')
+	for meme in $(ls -d $reg/*/)
+	do
+		let "count += 1"
+		REGULATOR_NAME=$regulator'_'$count
+		MOTIF_FILE=$meme/meme.txt
+		for i in $(ls $FASTA_DIR)
+		do
+			let "JOBN += 1"
+			echo "job_$JOBN:"
+			org=$(echo $i | awk 'BEGIN { FS = "." } ; {print $1}')
+			echo -e "\tmkdir $RESULTS_DIR/$org'_'$REGULATOR_NAME > /dev/null"
+			echo -e "\tmatrix-scan -m $MOTIF_FILE -matrix_format meme -i $FASTA_DIR/$i -bginput -markov 3 -return sites -o $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt -quick -n skip -uth pval 0.001 -pseudo 0.01"
+			echo -e "\t./parseRSAT -l -t 0.001 -o $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_orientation.tab'"
+			echo -e "\t./parseRSAT -l -t 0.001 $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_noorientation.tab'"
+			echo ""
+		done
+	done
+done
+
+alljobs="all: "
+while [ $JOBN -gt 0 ]; do
+	alljobs="$alljobs job_$JOBN"
+	let "JOBN -= 1"
+done
+
+echo $alljobs
+echo -e "\tsleep 1"
