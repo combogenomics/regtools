@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Launch OFS on a genome to predict the presence of operons
+# Citation: http://bioinformatics.oxfordjournals.org/content/21/7/880.long
+
+if [ "$#" -lt 1 ]; then
+    echo 'doOFS ORGANISM'
+    exit 65
+fi
+
+ORG=$1
+
+mkdir $ORG
+cd $ORG
+
+cp ../near/all.faa .
+cp ../near/all.ptt .
+cp ../$ORG.faa .
+cp ../$ORG.ptt .
+cp ../src/* .
+
+cat all.faa $ORG.faa > all-genomes.faa
+cat all.ptt $ORG.ptt > all-genomes.ptt
+
+formatdb -i all-genomes.faa
+formatdb -i $ORG.faa
+
+perl get_blast_hits.pl "$ORG" all-genomes.faa > all.blast
+perl get_orthologs.pl all.blast $ORG.faa all-genomes.faa > all.orthologs
+perl calc_bp_distance.pl all.orthologs all-genomes.ptt > all.bp_dist
+perl bp_stats.pl all.bp_dist 0.7 > informants.species
+perl filter_informants.pl informants.species  all-genomes.faa all-genomes.ptt informants
+formatdb -i informants.faa
+perl cluster_finder.pl $ORG.faa informants.faa $ORG.ptt informants.ptt 
+perl operon_finder.pl $ORG.ptt query_clusters.dat
+./op2tab $ORG"_operon_preds.dat" gi_2_loc.tab 0.5 > $ORG.tab
+
+mv $ORG.tab ../
+cd ..
+rm -rf $ORG

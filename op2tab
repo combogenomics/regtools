@@ -1,0 +1,41 @@
+#!/usr/bin/python
+
+import sys
+
+if len(sys.argv) < 4:
+	print 'USAGE: ./op2tab query_operons_pred.dat gi2loc.tab P'
+	sys.exit(1)
+
+preds, gi2loc, P = sys.argv[1:]
+P = float(P)
+
+gi = {}
+for l in open(gi2loc):
+	g,c = l.strip().split(' ')
+	gi[g] = c
+	
+op1 = {}
+i = 0
+for l in open(preds):
+	s=l.strip().split('\t')
+	if len(s) > 1:
+		if i not in op1:
+			op1[i]=set([gi[s[3]]])
+		else:
+			op1[i].add(gi[s[3]])
+	else:
+		if '*' in l:
+			i += 1
+		elif float(s[0]) < P:
+			i += 1
+
+torem=set()
+for k in op1:
+	if len(op1[k]) == 1:
+		torem.add(k)
+for k in torem:
+	del op1[k]
+
+for k in op1:
+	for g in op1[k]:
+		print '%s %s'%(k,g)
