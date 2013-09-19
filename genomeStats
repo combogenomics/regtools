@@ -1,0 +1,29 @@
+#! /usr/bin/python
+'''
+From a genbank directory outputs some useful informations about each genome
+'''
+
+import sys
+
+if len(sys.argv) < 2:
+    print 'USAGE: ./genomeStats GENBANK_DIR'
+    sys.exit(1)
+
+g_dir = sys.argv[1]
+
+from Bio import SeqIO
+import os
+from Bio.SeqUtils import GC
+
+print '\t'.join(['Genome', 'Length (Mb)', 'GC (%)', 'CDS'])
+for f in sorted(os.listdir(g_dir)):
+    cds = 0
+    s1 = None
+    for s in SeqIO.parse(open(os.path.join(g_dir, f)), 'genbank'):
+        if s1 is None:
+            s1 = s
+        else:
+            s1 += s
+        cds += len(filter(lambda x: x.type == 'CDS', s.features))
+    print '\t'.join([f.split('.')[0], str(round(float(len(s1))/1000000, 2)),
+                    str(round(GC(s1.seq), 2)), str(cds)])
