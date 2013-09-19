@@ -1,0 +1,36 @@
+#!/usr/bin/python
+'''
+Take a results directory and a palindrome file and move the relevant results
+a method tag should be added as well
+'''
+import sys
+import os
+import shutil
+
+if len(sys.argv) < 6:
+    print 'USAGE: copyResults RES_DIR PALINDROMES_FILE CATEGORY METHOD DEST_DIR'
+    sys.exit(1)
+
+resdir, palindrome, category, method, destdir = sys.argv[1:6]
+
+palindromes = set()
+for l in open(palindrome):
+    palindromes.add(l.strip())
+
+for f in filter(lambda x: not os.path.isdir(os.path.join(resdir,x)), os.listdir(resdir)):
+    try:
+        org, reg, regid, isp = f.split('.')[0].split('_')
+    except:
+        try:
+            org, reg1, reg2, regid, isp = f.split('.')[0].split('_')
+            reg = reg1 + '_' + reg2
+        except:
+            print 'Could not handle %s'%f
+            continue
+        
+    if (reg in palindromes and isp == 'noorientation' or
+        reg not in palindromes and isp == 'orientation'):
+        shutil.copy(os.path.join(resdir, f), destdir)
+        f1 = '_'.join([category, method, org, reg, regid]) + '.tab'
+        shutil.move(os.path.join(destdir, f), os.path.join(destdir, f1))
+    else:continue
