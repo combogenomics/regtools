@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Automagic script to launch doRSAT on many regulators/genomes
+
+if [ "$#" -lt 3 ]; then
+    echo 'autoParamsTable MOTIF_DIR FASTA_FILE TAG'
+    exit 65
+fi
+
+MOTIF_DIR=$1
+FASTA_FILE=$2
+TAG=$3
+
+for reg in $(ls -d $MOTIF_DIR/*/)
+do
+    count=0
+    regulator=$(echo $reg | awk 'BEGIN {FS = "/"}; {print ( $(NF-1) )}')
+	for meme in $(ls -d $reg/*/)
+	do
+	    let "count += 1"
+	    	motifparam=$(./motifParams $meme/meme.txt $FASTA_FILE)
+		I_min=$(echo $motifparam | awk '{print $4}')
+		I_reg=$(echo $motifparam | awk '{print $5}')
+		echo $TAG $regulator $count $I_min $I_reg
+	done
+done
+

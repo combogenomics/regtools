@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Automagic script to launch motifParams on many regulators
+
+if [ "$#" -lt 2 ]; then
+    echo 'autoParams MOTIF_DIR FASTA_FILE'
+    exit 65
+fi
+
+MOTIF_DIR=$1
+FASTA_FILE=$2
+
+for reg in $(ls -d $MOTIF_DIR/*/)
+do
+    regulator=$(echo $reg | awk 'BEGIN {FS = "/"}; {print ( $(NF-1) )}')
+	for meme in $(ls -d $reg/*/)
+	do
+	    echo $regulator
+	    ./motifParams $meme/meme.txt $FASTA_FILE
+	done
+done
