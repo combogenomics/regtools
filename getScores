@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Automagic script to stream the scores from parsed files (column 11)
+
+if [ "$#" -lt 1 ]; then
+    echo 'getScores INFILE(s)'
+    exit 65
+fi
+
+cat $@ | awk 'BEGIN {FS="\t"};{print $11}'

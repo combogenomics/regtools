@@ -1,0 +1,36 @@
+#!/usr/bin/python
+'''
+Takes a stream of scores and outputs the lower threshold to catch the outliers
+'''
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Takes a stream of scores and outputs the lower threshold to catch the outliers")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('-L', '--log', action="store_true",
+            default=False,
+            dest='log',
+            help='Compute the log10 of the provided values')
+    return parser.parse_args()
+
+options = getOptions()
+
+import numpy as np
+import sys
+import math
+
+if options.log:
+	a=np.loadtxt((math.log10(float(x)) for x in sys.stdin))
+else:
+	a=np.loadtxt(sys.stdin)
+
+from scipy.stats.mstats import mquantiles
+
+Q1, Q3 = mquantiles(a, prob=[0.25, 0.75])
+IQR = Q3-Q1
+threshold = Q1 - (1.5*IQR)
+
+print pow(10, threshold)
+
+

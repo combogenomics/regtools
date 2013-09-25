@@ -1,0 +1,40 @@
+#!/usr/bin/python
+'''
+Takes two files with scores and checks if the distributions are equal
+Uses the Kolmogorov-Smirnoff stat
+'''
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Takes two files with scores and checks if the distributions are equal. Uses the Kolmogorov-Smirnoff stat")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('file', action='store', nargs=2,
+                            help='Score file')
+    parser.add_argument('-L', '--log', action="store_true",
+            default=False,
+            dest='log',
+            help='Compute the log10 of the provided values')
+    return parser.parse_args()
+
+options = getOptions()
+
+import numpy as np
+import sys
+import math
+
+if options.log:
+	a=np.loadtxt((math.log10(float(x)) for x in open(options.file[0])))
+else:
+	a=np.loadtxt(open(options.file[0]))
+
+if options.log:
+        b=np.loadtxt((math.log10(float(x)) for x in open(options.file[1])))
+else:
+        b=np.loadtxt(open(options.file[1]))
+
+from scipy.stats import ks_2samp
+
+k,p=ks_2samp(a, b)
+print p
+
