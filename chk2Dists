@@ -15,6 +15,14 @@ def getOptions():
             default=False,
             dest='log',
             help='Compute the log10 of the provided values')
+    parser.add_argument('-R', '--random', action="store_true",
+            default=False,
+            dest='random',
+            help='Compute 100 random A/B comparisons')
+    parser.add_argument('-S', '--subset', action="store_true",
+            default=False,
+            dest='subset',
+            help='Use just 1/10th of the smallest sample for randomizations')
     return parser.parse_args()
 
 options = getOptions()
@@ -35,6 +43,40 @@ else:
 
 from scipy.stats import ks_2samp
 
-k,p=ks_2samp(a, b)
-print p
+print '\t'.join(['Mean A', 'Mean B', 'StdDev A', 'StdDev B', 'p-value KS'])
 
+i=1
+if options.random:
+	i=100
+	import random
+	ps = []
+	if len(a) > len(b):
+		sublen = len(b)/10
+	else:sublen = len(a)/10
+
+for j in range(i):
+	if options.random:
+		c = np.append(a,b)
+		random.shuffle(c)
+		if not options.subset:
+			d = c[:len(a)]
+			e = c[len(a):]
+		else:
+			d = c[:sublen]
+                        e = c[sublen:sublen*2]
+		k,p=ks_2samp(d, e)
+		ps.append(p)
+		if options.log:
+			print '\t'.join([str(x) for x in [pow(10,d.mean()), pow(10,e.mean()), pow(10,d.std()), pow(10,e.std()), p]])
+		else:
+			print '\t'.join([str(x) for x in [d.mean(), e.mean(), d.std(), e.std(), p]])
+	else:
+		k,p=ks_2samp(a, b)
+		if options.log:
+			print '\t'.join([str(x) for x in [pow(10,a.mean()), pow(10,b.mean()), pow(10,a.std()), pow(10,b.std()), p]])
+		else:
+			print '\t'.join([str(x) for x in [a.mean(), b.mean(), a.std(), b.std(), p]])
+
+if options.random:
+	print '\t'.join(['Mean P-value', 'StdDev P-value'])
+	print '\t'.join([str(x) for x in [np.array(ps).mean(), np.array(ps).std()]])
