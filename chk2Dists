@@ -22,7 +22,7 @@ def getOptions():
     parser.add_argument('-S', '--subset', action="store_true",
             default=False,
             dest='subset',
-            help='Use just 1/10th of the smallest sample for randomizations')
+            help='Use just 1/10th of the smallest sample')
     return parser.parse_args()
 
 options = getOptions()
@@ -46,10 +46,11 @@ from scipy.stats import ks_2samp
 print '\t'.join(['Mean A', 'Mean B', 'StdDev A', 'StdDev B', 'p-value KS'])
 
 i=1
+import random
 if options.random:
 	i=100
-	import random
 	ps = []
+if options.random or options.subset:
 	if len(a) > len(b):
 		sublen = len(b)/10
 	else:sublen = len(a)/10
@@ -71,6 +72,11 @@ for j in range(i):
 		else:
 			print '\t'.join([str(x) for x in [d.mean(), e.mean(), d.std(), e.std(), p]])
 	else:
+		if options.subset:
+			random.shuffle(a)
+			a[:sublen]
+			random.shuffle(b)
+			b[:sublen]
 		k,p=ks_2samp(a, b)
 		if options.log:
 			print '\t'.join([str(x) for x in [pow(10,a.mean()), pow(10,b.mean()), pow(10,a.std()), pow(10,b.std()), p]])
