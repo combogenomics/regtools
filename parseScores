@@ -1,0 +1,99 @@
+#!/bin/bash
+
+# Parses a bunch of motifSearches (tipically from a specific method)
+# Uses getScores and getThreshold
+# A file named paramsTable.txt should be present, containing the Imin and I
+# parameters for each regulator, as computed by motifParams
+# Only those regulators having score > Imin are used to compute the score
+# threshold.
+# Some methods have p-values whose log10 score is used
+#
+# tag reg  n Imin          Ireg
+# new ChvI 1 22.6739400442 14.6603348629
+# new FixJ 1 22.6739400442 24.592962035
+# new FixJ 2 22.6739400442 13.1111175173
+# new FixK 1 22.6739400442 18.1515146439
+#
+# Outputs the same files with just the lines above threshold
+
+OPTIND=1
+
+log=0
+
+while getopts "h?L" opt; do
+    case "$opt" in
+    h|\?)
+        echo 'USAGE: parseScores IN_DIR OUT_DIR'
+        echo '-L use the log10 score'
+        exit 0
+        ;;
+    L)  log=1
+        ;;
+    esac
+done
+
+n=1                                                                                       
+while [ $# -gt 0 ]; do                                                                    
+        if [ $n -lt $OPTIND ]; then  
+		# remove (shift) option arguments
+		# until they are all gone                                                     
+                let n=$n+1                                                                
+                shift                                                                     
+        else                                                                              
+                break;                                                                    
+        fi                                                                                
+done
+
+if [ "$#" -lt 2 ]; then
+    echo 'USAGE: parseScores IN_DIR OUT_DIR'
+    echo '-L use the log10 score'
+    exit 0
+fi
+
+IN_DIR=$1
+OUT_DIR=$2
+
+ABOVE=""
+BELOW=""
+
+for file in $(ls $IN_DIR);                                                 
+do
+    file1=$(echo $file | sed 's/SM_b/SMb/g')
+    tag=$(echo $file1 | awk 'BEGIN {FS="/"};{print $2}' | awk 'BEGIN {FS="_"};{print $1}');
+    reg=$(echo $file1 | awk 'BEGIN {FS="_"};{print $4}');
+    reg=$(echo $reg | sed 's/SMb/SM_b/g')
+    count=$(echo $file1 | awk 'BEGIN {FS="_"};{print $5}' | awk 'BEGIN {FS="."};{print $1}');
+    motifparam=$(cat paramsTable.txt | grep "$tag $reg $count");
+    I_min=$(echo $motifparam | awk '{print $4}');
+    I_reg=$(echo $motifparam | awk '{print $5}');
+
+    compare=$(echo "$I_reg>$I_min" | bc -l); # bc -l permette di comparare due numeri con la virgla
+
+    if [ $compare -gt 0 ]
+    then
+        ABOVE+=$file
+        ABOVE+=" "
+    else
+        BELOW+=$file
+        BELOW+=" "
+    fi
+done
+
+if [ $log == 1 ]
+then
+    Threshold=$(./getScores $ABOVE | ./getThreshold -L);
+else
+    Threshold=$(./getScores $ABOVE | ./getThreshold);
+fi
+echo "Score threshold: $Threshold"
+
+for file in $(ls $IN_DIR);	
+do	
+	file_1=$(echo $file | awk 'BEGIN {FS="/"};{print $2}');
+	if [ $log == 1 ]
+    then
+	    cat $file | awk -v t=$Threshold 'BEGIN {FS="\t"};{if($11<=t) print $0}' > $OUT_DIR/$file_1
+	else
+	    cat $file | awk -v t=$Threshold 'BEGIN {FS="\t"};{if($11>=t) print $0}' > $OUT_DIR/$file_1
+	fi
+done
