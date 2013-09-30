@@ -1,0 +1,57 @@
+#!/usr/bin/python
+'''
+Taken a directory of fasta files, finds the ones having one sequence and
+divides it by searching the 100 N's separators.
+Outputs a new fasta file with the description indicating the position in the
+original file.
+'''
+
+import sys
+import os
+import shutil
+from Bio import SeqIO
+
+if len(sys.argv) < 3:
+    print 'USAGE: ./splitScaffold INDIR OUTDIR'
+    sys.exit(1)
+    
+indir, outdir = sys.argv[1:3]
+
+for f in os.listdir(indir):
+    try:
+        s = SeqIO.read(os.path.join(indir, f), 'fasta')
+    except:
+        shutil.copy(os.path.join(indir, f), os.path.join(outdir, f))
+        continue
+    
+    f1 = open(os.path.join(outdir, '%s'%f), 'w')
+    
+    d = {}
+    j = 1
+    
+    prevpos = 0
+    
+    s = s.seq
+    
+    while True:
+        pos = s.find(''.join(['N' for i in range(100)]))
+
+        if pos == -1:break
+        
+        s1, s = s.split(''.join(['N' for i in range(100)]), 1)
+        
+        f1.write('>contig_%04d %d\n'%(j, prevpos))
+        f1.write('%s\n'%(str(s1)))
+        
+        j += 1
+        
+        prevpos = prevpos+pos+100
+   
+    if prevpos != 0:
+        f1.write('>contig_%04d %d\n'%(j, prevpos))
+        f1.write('%s\n'%(str(s)))
+    
+    f1.close()
+        
+        
+        
