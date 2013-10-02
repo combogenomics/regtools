@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Automagic script to merge the results file based on regulator name
+# input: directory filled with TAG_METHOD_ORG_REG_COUNT.tab
+# output: directory filled with TAG_ORG_REG.tab
+
+if [ "$#" -lt 2 ]; then
+	echo 'mergeMotifs IN_DIR OUT_DIR'
+	exit 65
+fi
+
+IN_DIR=$1
+OUT_DIR=$2
+
+for file1 in $(ls $IN_DIR)
+do
+    tag=$(echo $file1 | awk 'BEGIN {FS="_"};{print $1}');
+    org=$(echo $file1 | awk 'BEGIN {FS="_"};{print $3}');
+    reg=$(echo $file1 | awk 'BEGIN {FS="_"};{print $4}');
+    count=$(echo $file1 | awk 'BEGIN {FS="_"};{print $5}' | awk 'BEGIN {FS="."};{print $1}');
+    
+    cat $IN_DIR/$file1 >> $OUT_DIR/$tag'_'$org'_'$reg.tab
+done
