@@ -56,7 +56,7 @@ if square.is_integer():
 else:
     # Oh snap!
     cols = int(square)
-    rows = len(acts) / float(cols)
+    rows = len(nmeth) / float(cols)
     if not rows.is_integer():
         # Some fake signals will be added
         rows = int(rows) + 1
