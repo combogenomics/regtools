@@ -1,0 +1,114 @@
+#!/usr/bin/python
+'''
+Takes a results file (in which all the methods have been merged in)
+And outputs a merged file, indicating in column 10 how many methods give support
+'''
+
+import sys
+
+if len(sys.argv) < 2:
+    print 'USAGE: mergeMethods IN_FILE'
+    sys.exit(1)
+
+infile = sys.argv[1]
+
+# Anatomy of a hit
+# KH30Av1_psym570005 SKH30av1 + 2079152 2079171 - -90 -71 GTATTTGCAAAATATTTTCA nhmmer 1.0 100.0 Fur_1
+
+# Anatomy of a result hit
+# KH30Av1_psym570005 SKH30av1 + 2079152 2079171 - -90 -71 GTATTTGCAAAATATTTTCA 4 Fur_1
+
+class Hit(object):
+    def __init__(self, s):
+        self.gene = s[0]
+        self.dna = s[1]
+        self.strand = s[2]
+        self.start = int(s[3])
+        self.stop = int(s[4])
+        self.gstrand = s[5]
+        self.gstart = s[6]
+        self.gstop = s[7]
+        self.seq = s[8]
+        self.method = s[9]
+        self.score = s[10]
+        self.threshold = s[11]
+        self.reg = s[12]
+        self._fixRegName()
+        
+    def __str__(self):
+        return '\t'.join( [self.dna, self.strand, str(self.start),
+                           str(self.stop), self.gstrand, self.gstart, self.gstop,
+                           self.seq] )
+        
+    def __len__(self):
+        return self.stop-self.start
+        
+    def _fixRegName(self):
+        '''
+        Ugly exception handler for SM_b regulators
+        Removes the regulator tag (i.e. _1)
+        '''
+        reg = self.reg.replace('SM_b', 'SM-b')
+        reg = reg.split('_')[0]
+        reg = reg.replace('SM-b', 'SM_b')
+        self.reg = reg
+
+def checkMerge(h, hits):
+    '''
+    Check if the hit is included in or includes the hit set
+    Returns True or False
+    '''
+    if len(hits) == 0:
+        return True
+    
+    minstart = min([x.start for x in hits])
+    maxstop = max([x.stop for x in hits])
+    
+    if h.stop < minstart or h.start > maxstop:
+        return False
+    
+    # Included
+    if h.start >= minstart and h.stop <= maxstop:
+        return True
+        
+    # Includes
+    if h.start <= minstart and h.stop >= maxstop:
+        return True
+        
+    return False
+        
+# Read the whole file and create a set of hits - divided by dnaid
+hits = {}
+
+for l in open(infile):
+    s = l.rstrip().split('\t')
+    h = Hit(s)
+    
+    hits[h.dna] = hits.get(h.dna, set())
+    hits[h.dna].add(h)
+
+merged = []
+for dna in hits:
+    # Order them by hit start
+    shits = sorted(hits[dna], key=lambda x: x.start, reverse=True)
+
+    # Actual merge
+    m = set()
+    while len(shits) != 0:
+        h = shits.pop()
+        if checkMerge(h, m):
+            m.add(h)
+        else:
+            if len(m) > 0:
+                merged.append(m)
+            else:
+                m.add(h)
+                merged.append(m)
+            m = set()
+
+for h in merged:
+    for gene in set([x.gene for x in h]):
+        # Get the best motif (the longest one)
+        best = sorted(filter(lambda x:x.gene==gene, h), key=lambda x:len(x))[-1]
+        
+        print gene + '\t' + str(best) + '\t' + str(len(set([x.method for x in h]))) + '\t' + best.reg
