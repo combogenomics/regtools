@@ -94,3 +94,4 @@ for m in sorted(meth.keys()):
 
 plt.tight_layout()
 plt.savefig('%s.png'%reg)
+plt.savefig('%s.pdf'%reg)
