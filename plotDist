@@ -1,0 +1,91 @@
+#!/usr/bin/python
+
+import sys
+
+if len(sys.argv) < 3:
+    print 'USAGE: plotDist FILENAME INFILE [[INFILE] ...]'
+    sys.exit(1)
+
+fname = sys.argv[1]
+infiles = sys.argv[2:]
+
+logmethods = ['rsat', 'nhmmer', 'mast']
+
+import math
+
+meth = {}
+
+import numpy as np
+
+# Quick read to know which methods are there
+for f in infiles:
+    for l in open(f):
+        s = l.rstrip().split('\t')
+        me = s[9]
+        meth[me] = meth.get(me, None)
+
+def iterScores(method, infiles):
+    for f in infiles:
+        for l in open(f):
+            s = l.rstrip().split('\t')
+            sc = float(s[10])
+            me = s[9]
+            
+            if me == method:
+                if me in logmethods:
+                    yield -math.log10(sc)
+                else:
+                    yield sc
+
+for me in meth:
+    meth[me] = np.fromiter(iterScores(me, infiles), np.float)
+    
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+    
+fig = plt.figure(figsize=(10,10))
+
+colors = ['b', 'r', 'g', 'k']
+
+import numpy as np
+nmeth = np.array(meth.keys())
+
+# Array reshape (tricky!)
+# 1- Finger crossed for a perfect square
+square = np.sqrt( len(nmeth) )
+if square.is_integer():
+    # Yep
+    rows = cols = int(square)
+else:
+    # Oh snap!
+    cols = int(square)
+    rows = len(nmeth) / float(cols)
+    if not rows.is_integer():
+        # Some fake signals will be added
+        rows = int(rows) + 1
+    rows = int(rows)
+
+i = 0
+for m in sorted(meth.keys()):
+    ax = fig.add_subplot(rows, cols, i)
+    
+    j = i
+    while True:
+        if j > len(colors)-1:
+            j = i-len(colors)
+        else:
+            c = colors[j]
+            break
+    
+    ax.hist(meth[m], bins=100, color=c)
+    
+    ax.set_title('%s'%m)
+    #ax.set_ylim(0, 1)
+    #ax.set_xlim(min(pdist),0)
+    
+    i += 1
+
+plt.tight_layout()
+plt.savefig('%s.png'%fname)
+plt.savefig('%s.pdf'%fname)
