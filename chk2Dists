@@ -74,9 +74,9 @@ for j in range(i):
 	else:
 		if options.subset:
 			random.shuffle(a)
-			a[:sublen]
+			a=a[:sublen]
 			random.shuffle(b)
-			b[:sublen]
+			b=b[:sublen]
 		k,p=ks_2samp(a, b)
 		if options.log:
 			print '\t'.join([str(x) for x in [pow(10,a.mean()), pow(10,b.mean()), pow(10,a.std()), pow(10,b.std()), p]])
