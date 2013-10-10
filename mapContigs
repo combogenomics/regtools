@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Given a directory containing draft genomes fasta file
+# and a directory containing complete genomes fasta files
+# Produces a series of CONTIGuator mapping directories
+
+if [ "$#" -lt 2 ]; then
+    echo 'mapContigs DRAFT_DIR COMPLETE_DIR'
+    exit 65
+fi
+
+DRAFT_DIR=$1
+COMPLETE_DIR=$2
+
+
+for draft in $(ls $DRAFT_DIR)
+do
+    for complete in $(ls $COMPLETE_DIR)
+    do 
+        python CONTIGuator.py -c $DRAFT_DIR/$draft -r $COMPLETE_DIR/$complete -C 15 -B 1000 -f $draft'_'$complete'_'
+    done
+done

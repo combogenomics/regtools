@@ -1,0 +1,79 @@
+#!/usr/bin/python
+'''
+Parse the results of a CONTIGuator mapping
+They should be present as distinct directories in a folder
+The folder should have this format: DRAFT_COMPLETE_*
+The user can provide a Threshold of genomes in which the contig has to mapped
+to be assigned to a particular replicon.
+
+Inputs: IN_DIR MAP_THRESHOLD
+Outputs: a series of tab files
+CONTIG  REPLICON
+'''
+
+import sys
+
+if len(sys.argv) < 3:
+    print 'USAGE: parseContigs IN_DIR MAP_THRESHOLD'
+    sys.exit(1)
+
+indir, mapt = sys.argv[1:3]
+mapt = int(mapt)
+
+import os
+dir_1 = os.listdir(indir)
+Draft = {}
+
+for i in dir_1:
+	try:
+		draft, complete, maptag, replicon = i.split('_')
+	except:                                  
+		try:    
+			draft, complete, replicon = i.split('_')
+		except:
+			continue
+	try:
+		f = os.path.join(indir, i, 'MappedContigs.txt')
+		for l in open(f):
+			contig, number = l.split('\t')
+			#print draft, replicon, contig
+			Draft[draft] = Draft.get(draft, {})
+			Draft[draft][contig] = Draft[draft].get(contig, {})
+			Draft[draft][contig][replicon] = Draft[draft][contig].get(replicon, 0)
+			Draft[draft][contig][replicon] +=1
+	except:
+		f = os.path.join(indir, i, 'UnMappedContigs.txt')
+		for k in open(f):
+			contig, number = k.split('\t')
+			#print draft, replicon, contig
+			Draft[draft] = Draft.get(draft, {})
+			Draft[draft][contig] = Draft[draft].get(contig, {})
+			Draft[draft][contig][replicon] = Draft[draft][contig].get(replicon, 0)
+			Draft[draft][contig][replicon] +=1
+for draft in Draft:
+	draft_1 = draft + '.tab'
+	f = open(draft_1, 'w')
+	for contig in Draft[draft]:
+		keys = Draft[draft][contig].keys ()
+		if len(keys)==1:
+			if keys == ['UnMappedContigs']:
+				f.write(contig+'\t'+"UnMapped"+"\n")
+			else:
+				f.write(contig+'\t'+keys[0]+"\n")
+		elif len(keys)==2 and 'UnMappedContigs' in keys:
+			keys.remove('UnMappedContigs')
+			f.write(contig+'\t'+keys[0]+"\n")
+		elif len(keys)>=2:
+			b=False
+			for replicon in Draft[draft][contig]:
+				if Draft[draft][contig][replicon]>=mapt:
+					b=True
+					break
+			if b is True:
+				if replicon == ('UnMappedContigs'):
+					f.write(contig+'\t'+"UnMapped"+"\n")
+				else:
+					f.write(contig+'\t'+replicon+"\n")
+			else:
+				f.write(contig+'\t'+"UnMapped"+"\n")
+	f.close()
