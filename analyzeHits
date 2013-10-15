@@ -19,6 +19,10 @@ def getOptions():
                         dest='near',
                         default=None,
                         help='Near genomes file')
+    parser.add_argument('-N', '--no-near', action="store_true",
+                        default=False,
+                        dest='nonear',
+                        help='Consider the near genomes but don\'t plot them')
     parser.add_argument('-p', metavar='paramsfile', action='store',
                         dest='params',
                         default='params.txt',
@@ -108,26 +112,43 @@ if options.near is not None:
                                str(dparam[reg])] )
 
 import matplotlib.pyplot as plt
-                            
+from scipy import stats
+                        
 # Plot
 # Create the plot area
 plt.figure(figsize=(8,8))
+ax = plt.subplot(111)
+                        
+# Interpolation!
+slope, intercept, r_value, p_value, std_err = stats.linregress(ireg, regz)
+line = slope*np.array(ireg)+intercept
+ax.plot(ireg,line,'r-')
+ax.fill_between(ireg, line-std_err, line+std_err)
+if options.near is not None and not options.nonear:
+    slope, intercept, n_r_value, n_p_value, std_err = stats.linregress(n_ireg, n_regz)
+    line = slope*np.array(n_ireg)+intercept
+    ax.plot(n_ireg,line,'b-')
+    ax.fill_between(n_ireg, line-std_err, line+std_err)
+    ax.annotate("m - r: %.3f - p: %.3f\nn - r: %.3f - p: %.3f"%(r_value, p_value, n_r_value, n_p_value), (80, 0.95))
+else:
+    ax.annotate("r: %.3f - p: %.3f"%(r_value, p_value), (80, 0.95))
+                            
 # Reg
-plt.errorbar(ireg, regz, yerr=err,fmt='or',label='S. meliloti')
+ax.errorbar(ireg, regz, yerr=err,fmt='or',label='meliloti')
 # Near
-if options.near is not None:
-    plt.errorbar(n_ireg, n_regz, yerr=n_err,fmt='^b',label='Near genomes')
+if options.near is not None and not options.nonear:
+    ax.errorbar(n_ireg, n_regz, yerr=n_err,fmt='^b',label='near')
 
 # Make it nice
-plt.xlabel('I (information content, in bits)')
-plt.ylabel('Gene hits / Total hits')
-plt.legend(loc='best')
-plt.minorticks_on()
-plt.grid(b=True, which='major', linestyle='-', color='gray', axis='y')
-plt.grid(b=True, which='minor', linestyle='--', color='gray', axis='y')
+ax.set_xlabel('I (information content, in bits)')
+ax.set_ylabel('Gene hits / Total hits')
+ax.legend(loc='best')
+ax.minorticks_on()
+ax.grid(b=True, which='major', linestyle='-', color='gray', axis='y')
+ax.grid(b=True, which='minor', linestyle='--', color='gray', axis='y')
 
-plt.vlines(options.imin, 0, 1, color='k', linestyles='dashed', lw=3)
-plt.ylim(0,1)
+ax.vlines(options.imin, 0, 1, color='k', linestyles='dashed', lw=3)
+ax.set_ylim(0,1)
 
 plt.show()
 plt.draw()
