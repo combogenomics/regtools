@@ -1,0 +1,136 @@
+#!/usr/bin/python
+'''
+Takes a list of hits count and produces some stats
+
+INPUT: the stream from countHits
+ActR 1A42 0 537                                                            
+ActR 2011 1 600                                                            
+ActR 3841 0 644                                                            
+ActR 5A14 1 733
+[...]
+'''
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Takes a list of hits count and produces some stats")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('-n', metavar='nearfile', action='store',
+                        dest='near',
+                        default=None,
+                        help='Near genomes file')
+    parser.add_argument('-p', metavar='paramsfile', action='store',
+                        dest='params',
+                        default='params.txt',
+                        help='Motif parameters file')
+    parser.add_argument('-i', action="store",
+                        dest='imin',
+                        type=float,
+                        default=22.0,
+                        help='Imin: minimum information content')
+    return parser.parse_args()
+
+options = getOptions()
+
+near = set()
+if options.near is not None:
+    for l in open(options.near):
+        near.add(l.strip())
+
+dparam = {}
+for l in open(options.params):
+    reg, i = l.strip().split()
+    dparam[reg] = float(i)
+    
+import sys
+
+d = {}
+dother = {}
+
+for l in sys.stdin:
+    reg, org, genes, others = l.split()
+    genes = float(genes)
+    others = float(others)
+    
+    if org in near:
+        dother[reg] = dother.get(reg, [])
+        try:
+            v = genes/(others+genes)
+        except ZeroDivisionError:
+            v = 0.0
+        dother[reg].append((genes, others, v))
+    else:
+        d[reg] = d.get(reg, [])
+        try:
+            v = genes/(others+genes)
+        except ZeroDivisionError:
+            v = 0.0
+        d[reg].append((genes, others, v))
+
+import numpy as np
+import math
+
+# Print a tab-delimited table
+ireg = []
+regz = []
+err = []
+for reg in sorted(d.keys()):
+    ireg.append(dparam[reg])
+    
+    m = np.array([x[2] for x in d[reg]]).mean()
+    s = np.array([x[2] for x in d[reg]]).std() / math.sqrt(len(d[reg]))
+    
+    regz.append(m)
+    err.append(s)
+    
+    print '\t'.join( [reg, str(np.array([x[0] for x in d[reg]]).mean()),
+                           str(np.array([x[1] for x in d[reg]]).mean()),
+                           str(m),
+                           str(dparam[reg])] )
+
+if options.near is not None:
+    print 
+    n_ireg = []
+    n_regz = []
+    n_err = []
+    for reg in sorted(dother.keys()):
+        n_ireg.append(dparam[reg])
+    
+        m = np.array([x[2] for x in dother[reg]]).mean()
+        s = np.array([x[2] for x in dother[reg]]).std() / math.sqrt(len(dother[reg]))
+        
+        n_regz.append(m)
+        n_err.append(s)
+    
+        print '\t'.join( [reg, str(np.array([x[0] for x in dother[reg]]).mean()),
+                               str(np.array([x[1] for x in dother[reg]]).mean()),
+                               str(m),
+                               str(dparam[reg])] )
+
+import matplotlib.pyplot as plt
+                            
+# Plot
+# Create the plot area
+plt.figure(figsize=(8,8))
+# Reg
+plt.errorbar(ireg, regz, yerr=err,fmt='or',label='S. meliloti')
+# Near
+if options.near is not None:
+    plt.errorbar(n_ireg, n_regz, yerr=n_err,fmt='^b',label='Near genomes')
+
+# Make it nice
+plt.xlabel('I (information content, in bits)')
+plt.ylabel('Gene hits / Total hits')
+plt.legend(loc='best')
+plt.minorticks_on()
+plt.grid(b=True, which='major', linestyle='-', color='gray', axis='y')
+plt.grid(b=True, which='minor', linestyle='--', color='gray', axis='y')
+
+plt.vlines(options.imin, 0, 1, color='k', linestyles='dashed', lw=3)
+plt.ylim(0,1)
+
+plt.show()
+plt.draw()
+# Save the figure
+plt.savefig('genehits.png')
+plt.savefig('genehits.pdf')
