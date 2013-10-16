@@ -1,0 +1,105 @@
+#!/usr/bin/python
+'''
+Takes a list of hits count and produces some stats
+
+INPUT: the stream from countHits
+ActR 1A42 0 537                                                            
+ActR 2011 1 600                                                            
+ActR 3841 0 644                                                            
+ActR 5A14 1 733
+[...]
+'''
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Takes a list of hits count and produces some stats")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('folder', action="store",
+                        help='Folder where the hits files are stored')
+    parser.add_argument('-n', metavar='nearfile', action='store',
+                        dest='near',
+                        default=None,
+                        help='Near genomes file')
+    parser.add_argument('-b', action="store",
+                        dest='upstream',
+                        type=int,
+                        default=-600,
+                        help='Maximum distance from ATG [Default: -600]')
+    parser.add_argument('-a', action="store",
+                        dest='downstream',
+                        type=int,
+                        default=0,
+                        help='Maximum distance from ATG [Default: 0]')
+    parser.add_argument('-t', action="store",
+                        dest='threshold',
+                        type=int,
+                        default=3,
+                        help='Method\'s stringency [Default: 3]')
+    return parser.parse_args()
+
+options = getOptions()
+
+near = set()
+if options.near is not None:
+    for l in open(options.near):
+        near.add(l.strip())
+
+hits = {}
+
+import os
+
+for f in os.listdir(options.folder):
+        tag, org, reg = f.split('.')[0].split('_')
+        f = os.path.join(options.folder, f)
+        
+        if org in near:continue
+        
+        hits[reg] = hits.get(reg, [])
+        
+        for l in open(f):
+            s = l.rstrip().split("\t")
+            
+            if s[9] >= options.threshold and s[0] != '':
+                hits[reg].append((int(s[6])+int(s[7]))/2)
+
+import matplotlib.pyplot as plt
+from scipy.interpolate import interp1d
+import numpy as np
+plt.figure(figsize=(8, 8))
+window=10
+
+for reg in hits:
+    print 'Plotting %s'%reg
+
+    hits_1 = []
+    for start, stop in zip(range(options.upstream, options.downstream + window ,window),
+                           range(options.upstream + window, options.downstream + (2*window) ,window)):
+        hits_1.append(((start+stop)/2.0, len(filter(lambda x: x >= start and x <= stop, hits[reg]))))
+    hits_2 = []
+    maxV = max([x[1] for x in hits_1]) 
+    minV = min([x[1] for x in hits_1])
+    for pos, value in hits_1:
+        normV = (value-minV)/float(maxV-minV)
+        hits_2.append((pos, normV))
+        
+    f1 = interp1d([x[0] for x in hits_2], [x[1] for x in hits_2], kind='cubic')
+
+    xnew = np.linspace(options.upstream + (2*window), options.downstream , 1000000)
+
+    plt.clf()
+
+    plt.plot(xnew, f1(xnew),'r-', label=reg, linewidth=2)
+
+    plt.minorticks_on()
+    plt.grid(b=True, which='major', linestyle='-', color='gray', axis='x')
+    plt.grid(b=True, which='minor', linestyle='--', color='gray', axis='x')
+    plt.legend(loc='best')
+
+    plt.ylim(-0.2, 1.2)
+
+    plt.xlabel('Distance from ATG')
+    plt.ylabel('# hits (normalized)')
+
+    plt.savefig('%s.png'%reg)
+    plt.savefig('%s.pdf'%reg)
