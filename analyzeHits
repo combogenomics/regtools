@@ -23,6 +23,10 @@ def getOptions():
                         default=False,
                         dest='nonear',
                         help='Consider the near genomes but don\'t plot them')
+    parser.add_argument('-G', '--genes', action="store_true",
+                        default=False,
+                        dest='genes',
+                        help='Count the genes')
     parser.add_argument('-p', metavar='paramsfile', action='store',
                         dest='params',
                         default='params.txt',
@@ -47,6 +51,7 @@ for l in open(options.params):
     dparam[reg] = float(i)
     
 import sys
+import numpy as np
 
 d = {}
 dother = {}
@@ -57,22 +62,25 @@ for l in sys.stdin:
     others = float(others)
     
     if org in near:
-        dother[reg] = dother.get(reg, [])
         try:
             v = genes/(others+genes)
+            dother[reg] = dother.get(reg, [])
+            dother[reg].append((genes, others, v))
         except ZeroDivisionError:
-            v = 0.0
-        dother[reg].append((genes, others, v))
+            if options.genes:
+                dother[reg].append((genes, others, np.nan))
     else:
-        d[reg] = d.get(reg, [])
         try:
             v = genes/(others+genes)
+            d[reg] = d.get(reg, [])
+            d[reg].append((genes, others, v))
         except ZeroDivisionError:
-            v = 0.0
-        d[reg].append((genes, others, v))
+            if options.genes:
+                d[reg].append((genes, others, np.nan))
 
-import numpy as np
 import math
+
+g = set()
 
 # Print a tab-delimited table
 ireg = []
@@ -81,9 +89,14 @@ err = []
 for reg in sorted(d.keys()):
     ireg.append(dparam[reg])
     
-    m = np.array([x[2] for x in d[reg]]).mean()
-    s = np.array([x[2] for x in d[reg]]).std() / math.sqrt(len(d[reg]))
+    if not options.genes:
+        m = np.array([x[2] for x in d[reg]]).mean()
+        s = np.array([x[2] for x in d[reg]]).std() / math.sqrt(len(d[reg]))
+    else:
+        m = np.array([x[0] for x in d[reg]]).mean()
+        s = np.array([x[0] for x in d[reg]]).std() / math.sqrt(len(d[reg]))
     
+    g.add(m)
     regz.append(m)
     err.append(s)
     
@@ -100,9 +113,14 @@ if options.near is not None:
     for reg in sorted(dother.keys()):
         n_ireg.append(dparam[reg])
     
-        m = np.array([x[2] for x in dother[reg]]).mean()
-        s = np.array([x[2] for x in dother[reg]]).std() / math.sqrt(len(dother[reg]))
+        if not options.genes:
+            m = np.array([x[2] for x in dother[reg]]).mean()
+            s = np.array([x[2] for x in dother[reg]]).std() / math.sqrt(len(dother[reg]))
+        else:
+            m = np.array([x[0] for x in dother[reg]]).mean()
+            s = np.array([x[0] for x in dother[reg]]).std() / math.sqrt(len(dother[reg]))
         
+        g.add(m)
         n_regz.append(m)
         n_err.append(s)
     
@@ -124,14 +142,18 @@ slope, intercept, r_value, p_value, std_err = stats.linregress(ireg, regz)
 line = slope*np.array(ireg)+intercept
 ax.plot(ireg,line,'r-')
 ax.fill_between(ireg, line-std_err, line+std_err)
+if options.genes:
+    ipsilon = max(g)-(max(g)/float(10))
+else:
+    ipsilon = 0.9
 if options.near is not None and not options.nonear:
     slope, intercept, n_r_value, n_p_value, std_err = stats.linregress(n_ireg, n_regz)
     line = slope*np.array(n_ireg)+intercept
     ax.plot(n_ireg,line,'b-')
     ax.fill_between(n_ireg, line-std_err, line+std_err)
-    ax.annotate("m - r: %.3f - p: %.3f\nn - r: %.3f - p: %.3f"%(r_value, p_value, n_r_value, n_p_value), (80, 0.95))
+    ax.annotate("m - r: %.3f - p: %.3f\nn - r: %.3f - p: %.3f"%(r_value, p_value, n_r_value, n_p_value), (80, ipsilon))
 else:
-    ax.annotate("r: %.3f - p: %.3f"%(r_value, p_value), (80, 0.95))
+    ax.annotate("r: %.3f - p: %.3f"%(r_value, p_value), (80, ipsilon))
                             
 # Reg
 ax.errorbar(ireg, regz, yerr=err,fmt='or',label='meliloti')
@@ -141,14 +163,22 @@ if options.near is not None and not options.nonear:
 
 # Make it nice
 ax.set_xlabel('I (information content, in bits)')
-ax.set_ylabel('Gene hits / Total hits')
+if options.genes:
+    ax.set_ylabel('Gene hits')
+else:
+    ax.set_ylabel('Gene hits / Total hits')
 ax.legend(loc='best')
 ax.minorticks_on()
 ax.grid(b=True, which='major', linestyle='-', color='gray', axis='y')
 ax.grid(b=True, which='minor', linestyle='--', color='gray', axis='y')
 
-ax.vlines(options.imin, 0, 1, color='k', linestyles='dashed', lw=3)
-ax.set_ylim(0,1)
+
+if options.genes:
+    ax.set_ylim(0,max(g))
+    ax.vlines(options.imin, 0, max(g), color='k', linestyles='dashed', lw=3)
+else:
+    ax.set_ylim(0,1)
+    ax.vlines(options.imin, 0, 1, color='k', linestyles='dashed', lw=3)
 
 plt.show()
 plt.draw()
