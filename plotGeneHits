@@ -36,6 +36,10 @@ def getOptions():
                         type=int,
                         default=3,
                         help='Method\'s stringency [Default: 3]')
+    parser.add_argument('-p', metavar='paramsfile', action='store',
+                        dest='params',
+                        default='params.txt',
+                        help='Motif parameters file')
     return parser.parse_args()
 
 options = getOptions()
@@ -44,6 +48,11 @@ near = set()
 if options.near is not None:
     for l in open(options.near):
         near.add(l.strip())
+
+dparam = {}
+for l in open(options.params):
+    reg, i = l.strip().split()
+    dparam[reg] = float(i)
 
 hits = {}
 
@@ -97,6 +106,11 @@ for reg in hits:
     plt.legend(loc='best')
 
     plt.ylim(-0.2, 1.2)
+
+    if reg in dparam:
+        plt.title('Motif: %s - I: %.3f'%(reg, dparam[reg]), weight='bold')
+    else:
+        plt.title('Motif: %s'%(reg), weight='bold')
 
     plt.xlabel('Distance from ATG')
     plt.ylabel('# hits (normalized)')
