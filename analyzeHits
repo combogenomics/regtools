@@ -68,6 +68,7 @@ for l in sys.stdin:
             dother[reg].append((genes, others, v))
         except ZeroDivisionError:
             if options.genes:
+                dother[reg] = dother.get(reg, [])
                 dother[reg].append((genes, others, np.nan))
     else:
         try:
@@ -76,6 +77,7 @@ for l in sys.stdin:
             d[reg].append((genes, others, v))
         except ZeroDivisionError:
             if options.genes:
+                d[reg] = d.get(reg, [])
                 d[reg].append((genes, others, np.nan))
 
 import math
