@@ -20,9 +20,9 @@ for l in open(preds):
 	s=l.strip().split('\t')
 	if len(s) > 1:
 		if i not in op1:
-			op1[i]=set([gi[s[3]]])
+			op1[i]=[gi[s[3]]]
 		else:
-			op1[i].add(gi[s[3]])
+			op1[i].append(gi[s[3]])
 	else:
 		if '*' in l:
 			i += 1
