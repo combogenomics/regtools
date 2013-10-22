@@ -1,0 +1,39 @@
+#!/usr/bin/python
+'''
+From a regulatory network get all the downstream genes
+(including nested regulators and operons)
+
+The network should be in GML format
+'''
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("From a regulatory network get all the downstream genes")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('gmlfile', action='store', 
+                            help='Regulatory network GML file')
+    parser.add_argument('regulator', action='store',
+                            help='Regulator to be searched')
+    return parser.parse_args()
+
+options = getOptions()
+
+import networkx as nx
+
+net = nx.parse_gml(open(options.gmlfile))
+
+# Is the regulator really inside the network
+if options.regulator not in net.nodes():
+    raise KeyError('%s not present in network %s'%(options.regulator, options.gmlfile))
+
+downstream = set()
+nodes = nx.depth_first_search.dfs_successors(net, options.regulator)
+for n in nodes:
+    downstream.add(n)
+    for n1 in nodes[n]:
+        downstream.add(n1)
+
+for n in downstream:
+    print n
