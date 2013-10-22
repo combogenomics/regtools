@@ -1,0 +1,134 @@
+#!/usr/bin/python
+'''
+Create a regulatory network (organism centric)
+
+The network is saved in gml format
+'''
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Create a regulatory network (organism centric)")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('-r', metavar='reg2locus', action='store',
+                        dest='regloc',
+                        default=None,
+                        help='Regulator to locus_tag file')
+    parser.add_argument('-o', '--operon', action="store",
+                        default=None,
+                        dest='operon',
+                        help='Operon file')
+    parser.add_argument('-t', action="store",
+                        dest='treshold',
+                        type=int,
+                        default=3,
+                        help='Methods treshold')
+    parser.add_argument('-g', action="store",
+                        dest='organism',
+                        default='ORGANISM',
+                        help='Organism name [Default: ORGANISM]')
+    parser.add_argument('hitfiles', action='store', nargs='+',
+                            help='Regulatory hits files')
+    return parser.parse_args()
+
+options = getOptions()
+
+regloc = {}
+if options.regloc is not None:
+    for l in open(options.regloc):
+        s = l.strip().split('\t')
+        regloc[s[1]] = regloc.get(s[1], set())
+        regloc[s[1]].add(s[0])
+
+import networkx as nx
+
+op = nx.DiGraph()
+
+operons = {}
+if options.operon is not None:
+    prev_opid = None
+    prev_gene = None
+    for l in open(options.operon):
+        opid, gene = l.strip().split()
+        
+        op.add_node(gene)
+        if prev_opid == opid:
+            op.add_edge(prev_gene, gene)
+        
+        operons[opid] = operons.get(opid, [])
+        operons[opid].append(gene)
+
+        prev_opid = opid
+        prev_gene = gene
+
+net = nx.DiGraph()
+
+import numpy as np
+
+def addOperon(g, op, net):
+    genes = nx.node_connected_component(op.to_undirected(), g)
+    for gene in genes:
+        for gene1 in op[gene]:
+            # Add if not present yet
+            if gene not in net:
+                net.add_node(gene)
+                net.node[gene]['graphics'] = {'fill': '#2BA225'}
+                
+            if gene1 not in net[gene]:
+                if gene1 not in net:
+                    net.add_node(gene1)
+                    net.node[gene1]['graphics'] = {'fill': '#2BA225'}
+                net.add_edge(gene, gene1)
+
+import os
+
+for f in options.hitfiles:
+    reg = os.path.split(f)[-1].split('.')[0].split('_')[2]
+       
+    for rl in regloc[reg]:   
+        net.add_node(rl, name=reg)
+        net.node[rl]['graphics'] = {'fill': '#C72D31'}
+        
+        for l in open(f):
+            s = l.rstrip().split('\t')
+
+            if s[0] == '':
+                continue
+                
+            if int(s[9]) < options.treshold:
+                continue
+            
+            gene = s[0]
+            weight = int(s[9])
+            dist = ( int(s[6])+int(s[7]) ) / 2.0
+             
+            # Edge already present?
+            if gene in net[rl]:
+                # Added as an operon?
+                if 'weights' not in net[rl][gene] or 'dists' not in net[rl][gene]:
+                    net[rl][gene]['weights'] = []
+                    net[rl][gene]['dists'] = []
+                # Update the mean values
+                net[rl][gene]['weights'].append(weight)
+                net[rl][gene]['dists'].append(dist)
+                
+                net[rl][gene]['weight'] = np.array(net[rl][gene]['weights']).mean()
+                net[rl][gene]['dist'] = np.array(net[rl][gene]['dists']).mean()
+            else:
+                net.add_edge(rl, gene, weight=weight, dist=dist,
+                                       weights=[weight], dists=[dist])
+            
+            # Operons?
+            if gene in op.nodes():
+                addOperon(gene, op, net)
+
+# Remove the lists from each node
+for n in net:
+    for n1 in net[n]:
+        if 'weights' in net[n][n1]:
+            del net[n][n1]['weights']
+        if 'dists' in net[n][n1]:
+            del net[n][n1]['dists']
+
+nx.write_gml(net, '%s.gml'%options.organism)
