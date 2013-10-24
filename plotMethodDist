@@ -3,7 +3,7 @@
 import sys
 
 if len(sys.argv) < 3:
-    print 'USAGE: plotGeneDist REGULATOR INFILE [[INFILE] ...]'
+    print 'USAGE: plotMethodDist REGULATOR INFILE [[INFILE] ...]'
     sys.exit(1)
 
 reg = sys.argv[1]
