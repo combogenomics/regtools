@@ -12,6 +12,10 @@ def getOptions():
     # create the top-level parser
     description = ("From a regulatory network get all the downstream genes")
     parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('-N', '--name', action="store_true",
+            default=False,
+            dest='name',
+            help='The regulator name is provided [Default: locus_tag]')
     parser.add_argument('gmlfile', action='store', 
                             help='Regulatory network GML file')
     parser.add_argument('regulator', action='store',
@@ -25,11 +29,21 @@ import networkx as nx
 net = nx.parse_gml(open(options.gmlfile))
 
 # Is the regulator really inside the network
-if options.regulator not in net.nodes():
+if options.regulator not in net.nodes() and not options.name:
+    raise KeyError('%s not present in network %s'%(options.regulator, options.gmlfile))
+if options.regulator not in set(net.node[x].get('name', None) for x in net) and options.name:
     raise KeyError('%s not present in network %s'%(options.regulator, options.gmlfile))
 
+if options.name:
+    for n in net:
+        name = net.node[n].get('name', None)
+        if name == options.regulator:
+            snode = n
+else:
+    snode = options.regulator
+
 downstream = set()
-nodes = nx.depth_first_search.dfs_successors(net, options.regulator)
+nodes = nx.depth_first_search.dfs_successors(net, snode)
 for n in nodes:
     downstream.add(n)
     for n1 in nodes[n]:
