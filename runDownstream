@@ -1,0 +1,15 @@
+#!/usr/bin/python
+
+import sys
+
+if len(sys.argv) < 4:
+    print 'USAGE: runDownstream GML_FILE REGLOC ORG_ID'
+    sys.exit(1)
+    
+gmlfile, regloc, orgid = sys.argv[1:4]
+    
+for l in open(regloc):
+    loc, reg = l.strip().split('\t')
+       
+    print './getDownstream %s %s > %s_%s.tab'%(gmlfile, loc, orgid, reg)
+    
