@@ -72,12 +72,12 @@ def addOperon(g, op, net):
         for gene1 in op[gene]:
             # Add if not present yet
             if gene not in net:
-                net.add_node(gene)
+                net.add_node(gene, operon=1)
                 net.node[gene]['graphics'] = {'fill': '#2BA225'}
                 
             if gene1 not in net[gene]:
                 if gene1 not in net:
-                    net.add_node(gene1)
+                    net.add_node(gene1, operon=1)
                     net.node[gene1]['graphics'] = {'fill': '#2BA225'}
                 net.add_edge(gene, gene1)
 
@@ -109,6 +109,8 @@ for f in options.hitfiles:
                 if 'weights' not in net[rl][gene] or 'dists' not in net[rl][gene]:
                     net[rl][gene]['weights'] = []
                     net[rl][gene]['dists'] = []
+                    if 'operon' in net.node[gene]:
+                        del net.node[gene]['operon']
                 # Update the mean values
                 net[rl][gene]['weights'].append(weight)
                 net[rl][gene]['dists'].append(dist)
