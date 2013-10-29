@@ -1,0 +1,67 @@
+#!/usr/bin/python
+'''
+Obtain the orthologs of a series of regulators, producing a series of "regloc" files
+
+regloc file:
+locus_tag   REG_NAME
+
+pangenome tab file:
+orth_id    locus_tag
+
+target locus file:
+prot_id locus_tag   [dna_id replicon]
+'''
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ('Obtain the orthologs of a series of regulators, producing a series of "regloc" files')
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('inregloc', action='store', 
+                            help='Seed regloc file')
+    parser.add_argument('pangenome', action='store',
+                            help='Pangenome tab file')
+    parser.add_argument('locusfile', action='store', 
+                            help='Target locus file')
+    return parser.parse_args()
+    
+options = getOptions()
+
+r = {}
+for l in open(options.inregloc):
+    locus, reg = l.strip().split('\t')
+    r[reg] = r.get(reg, [])
+    r[reg].append(locus)
+    
+p = {}
+o = {}
+for l in open(options.pangenome):
+    if l.strip().startswith('#'):continue
+    orth, protein = l.strip().split('\t')
+    p[orth] = p.get(orth, set())
+    p[orth].add(protein)
+    o[protein] = orth
+    
+g = set()
+for l in open(options.locusfile):
+    s = l.strip().split('\t')
+    g.add(s[1])
+
+# Cycle through each regulator
+for reg, locuses in r.iteritems():
+    matches = 0
+    for locus in locuses:
+        orth = o[locus]
+        
+        # Is my target organism in this group?
+        # It may have some paralogs!
+        for protein in p[orth]:
+            if protein in g:
+                matches += 1
+                print '\t'.join([protein, reg])
+                
+    if matches == 0:
+        print '\t'.join(['NA', reg])
+            
+    

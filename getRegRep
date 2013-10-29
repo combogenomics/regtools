@@ -1,0 +1,52 @@
+#!/usr/bin/python
+'''
+Obtain the replicon of a series of regulators, producing a series of "regrep" files
+
+regloc file:
+locus_tag   REG_NAME
+
+locus file:
+prot_id locus_tag   [dna_id replicon]
+
+regrep file:
+replicon_id   REG_NAME
+'''
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ('Obtain the replicon of a series of regulators, producing a series of "regrep" files')
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('inregloc', action='store', 
+                            help='Seed regloc file')
+    parser.add_argument('locusfile', action='store', 
+                            help='Locus file')
+    return parser.parse_args()
+    
+options = getOptions()
+
+r = {}
+for l in open(options.inregloc):
+    locus, reg = l.strip().split('\t')
+    r[reg] = r.get(reg, [])
+    r[reg].append(locus)
+    
+g = {}
+for l in open(options.locusfile):
+    s = l.strip().split('\t')
+    locus = s[1]
+    replicon = s[3]
+    g[locus] = replicon
+
+# Cycle through each regulator
+for reg, locuses in r.iteritems():
+    matches = 0
+    for locus in locuses:
+        if locus not in g:
+            print '\t'.join(['NA', reg])
+            continue
+        
+        print '\t'.join([g[locus], reg])
+            
+    

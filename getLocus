@@ -1,0 +1,111 @@
+#!/usr/bin/python
+'''
+From a bunch of genbank files, obtain a series of files with:
+
+prot_id -> locus [-> dna_id -> replicon]
+
+To obtain the dna-to-replicon conversion, a series of tabular files are needed:
+dna_id -> replicon
+
+Also, a series of fasta files with coordinates are needed to0:
+>fake_dna_id START
+AGGATCGATAGGC
+'''
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("From a bunch of genbank files, obtain a prot_id to locus_tag conversion")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('gbkdir', action='store', 
+                            help='Genbank directory')
+    parser.add_argument('mapdir', action='store', nargs='?',
+                            default=None,
+                            help='Mapped replicons directory')
+    parser.add_argument('mapfastadir', action='store', nargs='?',
+                            default=None,
+                            help='Mapped replicons directory (with fasta)')
+    return parser.parse_args()
+    
+options = getOptions()
+
+from Bio import SeqIO
+import os
+import sys
+ 
+d = {}
+df = {}
+if options.mapdir is not None:
+    # Put the organisms name into a list
+    orgs = {x.split('.')[0] for x in os.listdir(options.gbkdir)}
+    
+    # Get the dna_id to replicon dictionary
+    filez = os.listdir(options.mapdir)
+    for org in orgs:
+        if org+'.tab' in filez:
+            d[org] = {}
+            for l in open(os.path.join(options.mapdir, org+'.tab')):
+                try:
+                    did, rep = l.strip().split('\t')
+                    d[org][did] = rep
+                except:continue
+
+    # Is it a "fake" draft?
+    if options.mapfastadir is not None:
+        filez = os.listdir(options.mapfastadir)
+        for org in orgs:
+            if org+'.fa' in filez:
+                df[org] = []
+                for s in SeqIO.parse(os.path.join(options.mapfastadir, org+'.fa'), 'fasta'):
+                    start = int(s.description.split()[1])
+                    df[org].append((start, s.id))
+        
+        for org in df:
+            df[org] = sorted(df[org], key=lambda x: x[0])
+
+# Get the actual job done
+for f1 in os.listdir(options.gbkdir):
+    org = f1.split('.')[0]
+    
+    o = open('%s.tab'%org, 'w')
+    
+    f2 = os.path.join(options.gbkdir, f1)
+    for s in SeqIO.parse(f2, 'genbank'):
+        for f in filter(lambda x: x.type == 'CDS', s.features):
+            out = []
+            if 'protein_id' in f.qualifiers:
+                out.append(f.qualifiers['protein_id'][0])
+            else:
+                out.append(f.qualifiers['locus_tag'][0])
+            out.append(f.qualifiers['locus_tag'][0])
+            
+            if options.mapdir:
+                out.append(s.id)
+                if org in d and org not in df:
+                    out.append(d[org][s.id])
+                else:
+                    start = int(f.location.start)
+                    stop = int(f.location.end)
+            
+                    found = False
+                    for a, b in zip(df[org], df[org][1:]+[df[org][0]]):
+                        pos, contig = a[0], a[1]
+                        pos1, contig1 = b[0], b[1]
+                        if start >= pos and stop <= pos1:
+                            found = True
+                            break
+                        elif pos1 < pos:
+                            if start >= pos:
+                                found = True
+                                break
+                    
+                    if found is True:
+                        out.append(d[org][contig])
+                    else:
+                        print '%d - %d not found in %s'%(start, stop, org)
+                        out.append('UnMapped')
+                        
+            o.write('\t'.join(out) + '\n')
+    o.close()
+
