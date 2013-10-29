@@ -16,6 +16,10 @@ def getOptions():
             default=False,
             dest='name',
             help='The regulator name is provided [Default: locus_tag]')
+    parser.add_argument('-G', '--genes', action="store_true",
+            default=False,
+            dest='genes',
+            help='Print the number of genes and operons')
     parser.add_argument('gmlfile', action='store', 
                             help='Regulatory network GML file')
     parser.add_argument('regulator', action='store',
@@ -43,11 +47,28 @@ else:
     snode = options.regulator
 
 downstream = set()
+
+genes = set()
+operons = set()
+
 nodes = nx.depth_first_search.dfs_successors(net, snode)
 for n in nodes:
+    if 'operon' in net.node[n]:
+        operons.add(n)
+    else:
+        genes.add(n)
+
     downstream.add(n)
     for n1 in nodes[n]:
+        if 'operon' in net.node[n1]:
+            operons.add(n1)
+        else:
+            genes.add(n1)
+
         downstream.add(n1)
 
-for n in downstream:
-    print n
+if options.genes:
+    print '\t'.join([str(len(genes)), str(len(operons))])
+else:
+    for n in downstream:
+        print n
