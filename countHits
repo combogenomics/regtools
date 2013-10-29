@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Automagic script to count genes/others hits
+
+if [ "$#" -lt 2 ]; then
+    echo 'countHits MOTIF_DIR N_METHODS'
+    exit 65
+fi
+
+MOTIF_DIR=$1
+N_METHODS=$2
+
+for reg in $(ls $MOTIF_DIR | awk 'BEGIN {FS="_"};{print $3}' | awk 'BEGIN {FS="."};{print $1}'| sort | uniq);
+do
+    for org in $(ls $MOTIF_DIR | awk 'BEGIN {FS="_"};{print $2}' | sort | uniq);
+    do
+        genes=$(cat $MOTIF_DIR/*$org*$reg* | awk -v t=$N_METHODS 'BEGIN {FS="\t"};{if ($1 != "" && $10 >= t) print "gene"}' | grep -c "gene";)
+        others=$(cat $MOTIF_DIR/*$org*$reg* | awk -v t=$N_METHODS 'BEGIN {FS="\t"};{if ($1 == "" && $10 >= t) print "gene"}' | grep -c "gene";)
+        echo $reg $org $genes $others
+    done
+done
