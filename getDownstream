@@ -32,11 +32,18 @@ import networkx as nx
 
 net = nx.parse_gml(open(options.gmlfile))
 
+import sys
 # Is the regulator really inside the network
 if options.regulator not in net.nodes() and not options.name:
-    raise KeyError('%s not present in network %s'%(options.regulator, options.gmlfile))
+    if options.genes:
+        print '\t'.join(['NA', 'NA'])
+    sys.exit(0)
+    #raise KeyError('%s not present in network %s'%(options.regulator, options.gmlfile))
 if options.regulator not in set(net.node[x].get('name', None) for x in net) and options.name:
-    raise KeyError('%s not present in network %s'%(options.regulator, options.gmlfile))
+    if options.genes:
+        print '\t'.join(['NA', 'NA'])
+    sys.exit(0)
+    #raise KeyError('%s not present in network %s'%(options.regulator, options.gmlfile))
 
 if options.name:
     for n in net:

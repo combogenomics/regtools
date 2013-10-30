@@ -35,11 +35,18 @@ def getOptions():
 options = getOptions()
 
 regloc = {}
+absreg = set()
 if options.regloc is not None:
     for l in open(options.regloc):
         s = l.strip().split('\t')
         regloc[s[1]] = regloc.get(s[1], set())
         regloc[s[1]].add(s[0])
+        if s[0] == 'NA':
+            absreg.add(s[1])
+
+# Remove the absent regulators
+for reg in absreg:
+    del regloc[reg]
 
 import networkx as nx
 
@@ -85,7 +92,9 @@ import os
 
 for f in options.hitfiles:
     reg = os.path.split(f)[-1].split('.')[0].split('_')[2]
-       
+    
+    if reg not in regloc:continue
+    
     for rl in regloc[reg]:   
         net.add_node(rl, name=reg)
         net.node[rl]['graphics'] = {'fill': '#C72D31'}
