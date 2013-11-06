@@ -1,0 +1,196 @@
+#!/usr/bin/python
+'''
+From a rpsblast against the COG database, parse and get the COG categories
+
+Inputs:
+- cog xml file
+- evalue threshold
+- cog to category tab file (COG00001    J)
+[- protein_id to locus tab file]
+'''
+
+class DbeBase:
+    def __init__(self):
+        pass
+    # General internal methods
+    def _NoImplYet(self):
+        '''Log a No implementation message'''
+        raise ObjError("Method not yet implemented")
+    def _CmdLineErr(self):
+        '''Generic message about the error while creating the command line'''
+        raise ObjError("Could not create the command line")
+    def _TryFileOpen(self, filename):
+        '''Try to open a file'''
+        try:
+            return open(filename)
+        except IOError:
+            raise IOError
+    def TryObj(self):
+        '''Verify the Object'''
+        pass
+
+class BioPyWrapper(DbeBase):
+    def __init__(self):
+        try:DbeBase.__init__(self)
+        except Exception, e:raise ObjError(e)
+        try:
+            # Try to import BioPython
+            import Bio
+        except ImportError, e:
+            raise ObjError(e)
+
+class Blast(BioPyWrapper):
+    import sys
+    # Usefull class for parsing
+    class BlastHit:
+        def __init__(self,query,query_len,hit,hit_desc,hit_len,id,al,mi,ga,qs,qe,ss,se,ev,bi):
+            self.query=query
+            self.query_id=query.split(' ')[0]
+            self.query_len=int(query_len)
+            self.hit=hit
+            self.hit_desc=hit_desc
+            self.hit_len=int(hit_len)
+            self.identity=float(id)
+            self.align_len=int(al)
+            self.mismatches=int(mi)
+            self.gaps=int(ga)
+            self.query_start=int(qs)
+            self.query_end=int(qe)
+            self.subjct_start=int(ss)
+            self.subjct_end=int(se)
+            self.evalue=float(ev)
+            self.bits=float(bi)
+        def getTabular(self):
+            s=(self.query_id+'\t'+self.hit+'\t'+str(self.identity*100)+'\t'+str(self.align_len)+
+                '\t'+str(self.mismatches)+'\t'+str(self.gaps)+'\t'+str(self.query_start)+'\t'+
+                str(self.query_end)+'\t'+str(self.subjct_start)+'\t'+str(self.subjct_end)+'\t'+
+                str(self.evalue)+'\t'+str(self.bits))
+            return s
+        def getHomologyIndex(self):
+            '''
+            Get an Index usefull for stating the quality of the homology measure
+            '''
+            import math
+            HI=(math.pow(self.identity,2)*(float(self.hit_len))/(float(self.query_len))*(float(self.align_len)/float(self.query_len)))
+            return HI
+        def getHitCoverage(self):
+            '''
+            Get the hit coverage
+            '''
+            return float(float(self.align_len)/float(self.hit_len))
+        def getQueryCoverage(self):
+            '''
+            Get the query coverage
+            '''
+            return float(float(self.align_len)/float(self.query_len))
+    def __init__(self):
+        try:BioPyWrapper.__init__(self)
+        except Exception, e:raise ObjError(e)
+        # Fill the default parameters
+        self._query=''
+        self._db=''
+        self._out=''
+        self._evalue=''
+        self._outfmt=''
+        self._task=''
+        self._subject=''
+        self._additional=''
+        # "After parse" objects
+        self._AlignRanges = [(0,0)]
+        # Very Important: Reset this to iter
+        self._CurrentBlastQuery = None
+        # Needed to re-parse
+        self._XML = ''
+        # Hit details
+        # {accession} = [(qStrt,qEnd,sStart,sEnd)]
+        self._hitsDetails = {}
+        # Every time a query is searched, store it e-value
+        self._currExpect = 'None'
+    def ParseBlast(self, fileOut = '', silent = 0):
+        '''Parse the xml blast output -- default file is self._out'''
+        from Bio.Blast import NCBIXML
+        # Open and parse the Blast xml outputfile
+        # Keep it in the object
+        try:
+            result_handle = self._TryFileOpen(fileOut)
+            self._XML = fileOut
+        except IOError:
+            try:
+                result_handle = self._TryFileOpen(self._out)
+            except IOError:
+                raise ObjError('Could not open result file '+
+                                    str(fileOut))
+        self._BlastHits = NCBIXML.parse(result_handle)
+        return 0
+    def GetAllCOGs(self, fExpect=0.05):
+      '''Obtain all the COG accessions
+      IMPORTANT: it is supposed that the parsed blast results come from a rpsblast
+      return value: a dictionary [query_id] = [COG1,COG2,..]'''
+      try:
+        dCOG = {}
+        # Cycle through the list and search for our query
+        for BQuery in self._BlastHits:
+          dCOG[BQuery.query] = set()
+          for align in BQuery.alignments:
+            bOk = 0
+            for hit in align.hsps:
+              if hit.expect < fExpect:
+                bOk = 1
+            if bOk:
+              # This alignment had at least one hit below threshold
+              dCOG[BQuery.query].add(align.hit_def.split(',')[0])
+        return dCOG
+      except Exception, e:
+        raise ObjError(e)
+
+
+def getOptions():
+    import argparse
+    description = "Get the COG categories from a rpsblast scan (xmlfiles)"
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('cogfile', action='store', 
+                            help='rpsblast xml file')
+    parser.add_argument('evalue', action='store',
+                            type=float,
+                            help='E-value threshold')
+    parser.add_argument('cogtab', action='store',
+                            help='COG to category file')
+    parser.add_argument('prot2locus', action='store', nargs='?',
+                            default=None,
+                            help='protein_id to locus file')
+    return parser.parse_args()
+
+options = getOptions()                         
+
+parser = Blast()
+parser.ParseBlast(options.cogfile)
+d = parser.GetAllCOGs(options.evalue)
+
+if d=={}:
+  sys.exit(0)
+
+dCCat={}
+# File with the association COGID -> category
+for l in open(options.cogtab):
+    s=l.replace('\n','').split('\t')
+    dCCat[s[0]]=s[1]
+    
+# Prot2locus file?
+p2l = {}
+if options.prot2locus is not None:
+    for l in open(options.prot2locus):
+        s = l.strip().split('\t')
+        prot = s[0]
+        loc = s[1]
+        p2l[prot] = loc
+
+dCOGs={}
+for prot, cogs in d.iteritems():
+    prot = prot.split()[0]
+    if '|' in prot:
+        prot = prot.split('|')[-2]
+    for cog in cogs:
+        if options.prot2locus is not None:
+            print '\t'.join( (p2l[prot], cog, dCCat.get(cog, '')) )
+        else:
+            print '\t'.join( (prot, cog, dCCat.get(cog, '')) )
