@@ -173,7 +173,7 @@ dCCat={}
 # File with the association COGID -> category
 for l in open(options.cogtab):
     s=l.replace('\n','').split('\t')
-    dCCat[s[0]]=s[1]
+    dCCat[s[0]]=(s[1], s[2])
     
 # Prot2locus file?
 p2l = {}
@@ -191,6 +191,6 @@ for prot, cogs in d.iteritems():
         prot = prot.split('|')[-2]
     for cog in cogs:
         if options.prot2locus is not None:
-            print '\t'.join( (p2l[prot], cog, dCCat.get(cog, '')) )
+            print '\t'.join( (p2l[prot], cog, dCCat.get(cog, '')[0], dCCat.get(cog, '')[1]) )
         else:
-            print '\t'.join( (prot, cog, dCCat.get(cog, '')) )
+            print '\t'.join( (prot, cog, dCCat.get(cog, '')[0], dCCat.get(cog, '')[1]) )
