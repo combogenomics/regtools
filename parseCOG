@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/pypy
 '''
 From a rpsblast against the COG database, parse and get the COG categories
 
@@ -15,10 +15,10 @@ class DbeBase:
     # General internal methods
     def _NoImplYet(self):
         '''Log a No implementation message'''
-        raise ObjError("Method not yet implemented")
+        raise Exception("Method not yet implemented")
     def _CmdLineErr(self):
         '''Generic message about the error while creating the command line'''
-        raise ObjError("Could not create the command line")
+        raise Exception("Could not create the command line")
     def _TryFileOpen(self, filename):
         '''Try to open a file'''
         try:
@@ -32,12 +32,12 @@ class DbeBase:
 class BioPyWrapper(DbeBase):
     def __init__(self):
         try:DbeBase.__init__(self)
-        except Exception, e:raise ObjError(e)
+        except Exception, e:raise e
         try:
             # Try to import BioPython
             import Bio
         except ImportError, e:
-            raise ObjError(e)
+            raise e
 
 class Blast(BioPyWrapper):
     import sys
@@ -118,7 +118,7 @@ class Blast(BioPyWrapper):
             try:
                 result_handle = self._TryFileOpen(self._out)
             except IOError:
-                raise ObjError('Could not open result file '+
+                raise IOError('Could not open result file '+
                                     str(fileOut))
         self._BlastHits = NCBIXML.parse(result_handle)
         return 0
@@ -141,7 +141,7 @@ class Blast(BioPyWrapper):
               dCOG[BQuery.query].add(align.hit_def.split(',')[0])
         return dCOG
       except Exception, e:
-        raise ObjError(e)
+        raise e
 
 
 def getOptions():
@@ -177,12 +177,14 @@ for l in open(options.cogtab):
     
 # Prot2locus file?
 p2l = {}
+locus=set()
 if options.prot2locus is not None:
     for l in open(options.prot2locus):
         s = l.strip().split('\t')
         prot = s[0]
         loc = s[1]
         p2l[prot] = loc
+        locus.add(loc)
 
 dCOGs={}
 for prot, cogs in d.iteritems():
@@ -191,6 +193,15 @@ for prot, cogs in d.iteritems():
         prot = prot.split('|')[-2]
     for cog in cogs:
         if options.prot2locus is not None:
-            print '\t'.join( (p2l[prot], cog, dCCat.get(cog, '')[0], dCCat.get(cog, '')[1]) )
+            if prot not in p2l and prot not in locus:
+                f = open('missing', 'a')
+                f.write(prot+'\n')
+                f.close()
+                print '\t'.join( (prot, cog, dCCat.get(cog, '')[0], dCCat.get(cog, '')[1]) )
+                continue
+            elif prot in locus:
+                print '\t'.join( (prot, cog, dCCat.get(cog, '')[0], dCCat.get(cog, '')[1]) )
+            else:
+                print '\t'.join( (p2l[prot], cog, dCCat.get(cog, '')[0], dCCat.get(cog, '')[1]) )
         else:
             print '\t'.join( (prot, cog, dCCat.get(cog, '')[0], dCCat.get(cog, '')[1]) )
