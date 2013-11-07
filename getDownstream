@@ -36,12 +36,12 @@ import sys
 # Is the regulator really inside the network
 if options.regulator not in net.nodes() and not options.name:
     if options.genes:
-        print '\t'.join(['NA', 'NA'])
+        print '\t'.join([options.regulator, 'NA', 'NA'])
     sys.exit(0)
     #raise KeyError('%s not present in network %s'%(options.regulator, options.gmlfile))
 if options.regulator not in set(net.node[x].get('name', None) for x in net) and options.name:
     if options.genes:
-        print '\t'.join(['NA', 'NA'])
+        print '\t'.join([options.regulator, 'NA', 'NA'])
     sys.exit(0)
     #raise KeyError('%s not present in network %s'%(options.regulator, options.gmlfile))
 
@@ -75,7 +75,7 @@ for n in nodes:
         downstream.add(n1)
 
 if options.genes:
-    print '\t'.join([str(len(genes)), str(len(operons))])
+    print '\t'.join([options.regulator, str(len(genes)), str(len(operons))])
 else:
     for n in downstream:
         print n
