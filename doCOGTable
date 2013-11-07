@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# From a directory w/ cog results prepares a table with the number of proteins assigned to each category
+
+# COG results file:
+# SMa1653 COG1853 R       Conserved protein/domain typically associated with flavoprotein oxygenases, DIM6/NTAB family
+# SMc04396        COG1653 G       ABC-type sugar transport system, periplasmic component
+# SM_b20502       COG4158 R       Predicted ABC-type sugar transport system, permease component
+# SM_b20502       COG4214 G       ABC-type xylose transport system, permease component
+
+if [ "$#" -lt 1 ]; then
+    echo 'doCOGTable COG_DIR'
+    exit 65
+fi
+
+COG_DIR=$1
+
+k=""
+for org in $(ls Cog_c/ | awk 'BEGIN {FS="."};{print $1}')
+do
+   k=$k" "$org
+done
+echo ""$k
+
+for c in $(cat Cog_c/* | awk '{FS="\t"};{print $3}'| awk 'BEGIN{FS=""}{for(i=1;i<=NF;i++)print $(i)}' | sort | uniq)
+do
+  L=$c
+  for org in $(ls Cog_c/ | awk 'BEGIN {FS="."};{print $1}')
+  do
+    s=$(cat Cog_c/$org.tab | awk 'BEGIN {FS="\t"};{for(i=1;i<=length($3);i++) print $1"found"substr($3, i, 1)}' | sort | uniq | grep -c found$c)
+    L=$L" "$s
+  done
+  echo $L
+done
