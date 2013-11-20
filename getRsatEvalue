@@ -1,0 +1,29 @@
+#!/usr/bin/python
+'''
+Converts rsat hits P-value into E-values, considering the length of the motif
+and the length of the genome.
+'''
+
+import sys
+from Bio import SeqIO
+
+if len(sys.argv) < 3:
+    print 'USAGE: ./getRsatEvalue HITS_FILE FASTA_FILE'
+    sys.exit(1)
+
+infile = sys.argv[1]
+seqfile = sys.argv[2]
+
+dsize = 0
+for s in SeqIO.parse(seqfile, 'fasta'):
+    dsize += len(s)
+
+for l in open(infile):
+    if l.startswith('#'):continue
+    s = l.strip().split()
+
+    ev = float(s[8]) * ( int(s[5]) - int(s[4]) ) * dsize
+    
+    s[8] = str(ev)
+    
+    sys.stdout.write( '\t'.join(s) + '\n' )

@@ -348,7 +348,7 @@ class SearchMotif(object):
         
         # Define our scoere threshold
         distribution = m.pssm.distribution()
-        score_t = distribution.threshold_fnr(0.005)
+        score_t = distribution.threshold_patser()
         
         pssm = m.pssm
     

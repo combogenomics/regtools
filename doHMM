@@ -21,6 +21,6 @@ do
 
     nhmmer --max -E 100 --tblout $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $MOTIF_FILE $FASTA_DIR/$i > /dev/null
 
-	./parseHMM -t 100 -l -o $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $MOTIF_FILE $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_orientation.tab'
-	./parseHMM -t 100 -l $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $MOTIF_FILE $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_noorientation.tab'
+	./parseHMM -t 1e-4 -l -o $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $MOTIF_FILE $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_orientation.tab'
+	./parseHMM -t 1e-4 -l $RESULTS_DIR/$org'_'$REGULATOR_NAME/hits.txt $GENBANK_DIR/$org.gbk $MOTIF_FILE $REGULATOR_NAME > $RESULTS_DIR/$org'_'$REGULATOR_NAME'_noorientation.tab'
 done
