@@ -19,11 +19,28 @@ def getOptions():
                         default=None,
                         dest='operon',
                         help='Operon file')
+    parser.add_argument('-d', action="store",
+                        dest='maxdist',
+                        type=int,
+                        default=None,
+                        help='Maximum distance from ATG')
     parser.add_argument('-t', action="store",
-                        dest='treshold',
+                        dest='threshold',
                         type=int,
                         default=3,
-                        help='Methods treshold')
+                        help='Methods threshold [consensus or score].')
+    parser.add_argument('-S', '--score', action="store_true",
+            default=False,
+            dest='score',
+            help='Use score files [Default: merged files]')
+    parser.add_argument('-U', '--upscore', action="store_true",
+            default=False,
+            dest='upscore',
+            help='The score needs to be HIGHER than the threshold [Default: lower]')
+    parser.add_argument('-m', '--method', action="store",
+                        default=None,
+                        dest='method',
+                        help='Method name [if -S]')
     parser.add_argument('-g', action="store",
                         dest='organism',
                         default='ORGANISM',
@@ -104,13 +121,26 @@ for f in options.hitfiles:
 
             if s[0] == '':
                 continue
-                
-            if int(s[9]) < options.treshold:
-                continue
+            
+            if options.score:
+                if s[9] != options.method:continue
+                if options.upscore and float(s[10]) < options.threshold:
+                    continue
+                elif not options.upscore and float(s[10]) < options.threshold:
+                    continue 
+            else:
+                if int(s[9]) < options.threshold:
+                    continue
             
             gene = s[0]
-            weight = int(s[9])
+            if options.score:
+                weight = int(s[10])
+            else:
+                weight = float(s[9])
             dist = ( int(s[6])+int(s[7]) ) / 2.0
+            
+            if options.maxdist is not None and abs(dist) > options.maxdist:
+                continue 
              
             # Edge already present?
             if gene in net[rl]:
