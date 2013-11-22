@@ -71,10 +71,10 @@ do
 
     if [ $compare -gt 0 ]
     then
-        ABOVE+=$file
+        ABOVE+=$IN_DIR/$file
         ABOVE+=" "
     else
-        BELOW+=$file
+        BELOW+=$IN_DIR/$file
         BELOW+=" "
     fi
 done
@@ -89,11 +89,11 @@ echo "Score threshold: $Threshold"
 
 for file in $(ls $IN_DIR);	
 do	
-	file_1=$(echo $file | awk 'BEGIN {FS="/"};{print $2}');
+	file_1=$(echo $file | awk 'BEGIN {FS="/"};{print $NF}');
 	if [ $log == 1 ]
     then
-	    cat $file | awk -v t=$Threshold 'BEGIN {FS="\t"};{if($11<=t) print $0}' > $OUT_DIR/$file_1
+	    cat $IN_DIR/$file | awk -v t=$Threshold 'BEGIN {FS="\t"};{if($11<=t) print $0}' > $OUT_DIR/$file_1
 	else
-	    cat $file | awk -v t=$Threshold 'BEGIN {FS="\t"};{if($11>=t) print $0}' > $OUT_DIR/$file_1
+	    cat $IN_DIR/$file | awk -v t=$Threshold 'BEGIN {FS="\t"};{if($11>=t) print $0}' > $OUT_DIR/$file_1
 	fi
 done
