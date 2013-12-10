@@ -1,0 +1,33 @@
+#!/usr/bin/python
+'''
+Takes a stream of scores and performs a normality test
+'''
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Takes a stream of scores and performs a normality test")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('-L', '--log', action="store_true",
+            default=False,
+            dest='log',
+            help='Compute the log10 of the provided values')
+    return parser.parse_args()
+
+options = getOptions()
+
+import numpy as np
+import sys
+import math
+
+if options.log:
+	a=np.loadtxt((math.log10(float(x)) for x in sys.stdin))
+else:
+	a=np.loadtxt(sys.stdin)
+
+from scipy.stats.stats import normaltest
+
+k2, p = normaltest(a)
+print k2, p
+
+
