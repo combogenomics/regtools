@@ -1,0 +1,197 @@
+#!/usr/bin/pypy
+'''
+Take a pangenome and prepare a series of fasta files for alignment
+Genes and upstream regions will be used
+'''
+
+__author__ = "Marco Galardini"
+
+from Bio import SeqIO
+import os
+from regtools import *
+
+################################################################################
+# Read options
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('pancateg', action="store",
+                            help='Pangenome category file')
+    parser.add_argument('pangenome', action="store",
+                            help='Pangenome file')
+    parser.add_argument('gbkdir', action="store",
+                            help='Genbank files directory')
+    parser.add_argument('outdir', action="store",
+                            help='Output files directory')
+    parser.add_argument('-g', '--max-genes-diff', action='store',
+                        type=int,
+                        default=60,
+                        dest='maxgenes',
+                        help='Max genes length difference [Default: 60bp]')
+    parser.add_argument('-u', '--min-upstreams-len', action='store',
+                        type=int,
+                        default=5,
+                        dest='minups',
+                        help='Minimum upstream length [Default: 5bp]')
+    
+    return parser.parse_args()
+
+################################################################################
+# Functions
+ 
+def parsePangenome(infile):
+    d = {}
+    for l in open(infile):
+        if l.strip().startswith('#'):continue
+        
+        orth, prot = l.strip().split()
+        d[orth] = d.get(orth, set())
+        d[orth].add(prot)
+        
+    return d
+    
+def parsePangenomeCat(infile):
+    d = {}
+    for l in open(infile):
+        if l.strip().startswith('#'):continue
+        
+        orth, cat, orgs = l.strip().split()
+        d[cat] = d.get(cat, set())
+        d[cat].add(orth)
+        
+    return d
+        
+def getUpstreams(record, b_up=600, b_down=0, is_circ=True, all_up=False):
+    genes=get_genes(record)
+    if len(genes)==0:
+        return []
+    whole_seq=get_whole_genome_seq(record)
+    if not all_up:
+        upstreams=get_all_upstreams(genes,whole_seq, b_up, b_down, is_circ)
+    else:
+        upstreams=get_all_upstreams_all(genes,whole_seq, b_up, b_down, is_circ)
+    return upstreams
+
+################################################################################
+# Main
+
+if __name__ == "__main__":
+    options = getOptions()
+
+    print 'Parsing the pangenome'
+
+    # Parsing da pangenome
+    dp  = parsePangenome(options.pangenome)
+    dc = parsePangenomeCat(options.pancateg)
+    
+    print 'Parsing the genbank'
+    
+    # Parsing da genbanks
+    dgenes = {}
+    locorg = {}
+    
+    dups = {}
+    uporg = {}
+    for f in os.listdir(options.gbkdir):
+        org = f.split('.')[0]
+        
+        print org
+        
+        dgenes[org] = {}
+        dups[org] = {}
+        
+        for s in SeqIO.parse(os.path.join(options.gbkdir, f), 'genbank'):
+        
+            # Get da genes
+            for p in filter(lambda x: x.type == 'CDS', s.features):
+                locorg[p.qualifiers['locus_tag'][0]] = org
+                if p.strand > 0:
+                    dgenes[org][p.qualifiers['locus_tag'][0]] = str(
+                                                    s[int(p.location.start):
+                                                      int(p.location.end)].seq)
+                else:
+                    dgenes[org][p.qualifiers['locus_tag'][0]] = str(
+                                                    s[int(p.location.start):
+                                                      int(p.location.end)].reverse_complement().seq)
+                                                      
+            # Get da upstream regions
+            upstream = getUpstreams(s)
+            for u in upstream:
+                dups[org][u.name] = u
+                uporg[u.name] = org
+    
+    print 'Getting the core genes/upstreams'
+    
+    ogenes = set()
+    oupstreams = set()
+
+    # We want only the core genes
+    for orth in dc['core']:
+        locs = dp[orth]
+        
+        skip = False
+        
+        # Get the genes
+        genes = []
+        for l in locs:
+            # There may be some leftovers from the annotation
+            # Discard them
+            if l not in locorg:
+                skip = True
+                break
+            #
+            org = locorg[l]
+            genes.append( (org, dgenes[org][l]) )
+           
+        # Get the upstreams
+        ups = []
+        for l in locs:
+            # There may be some leftovers from the annotation
+            # Discard them
+            if l not in uporg:
+                skip = True
+                break
+            #
+            org = uporg[l]
+            ups.append( (org, dups[org][l]) )
+
+        if skip:continue
+
+        # Check the length threshold
+        # Genes
+        #print orth, set([len(x[1]) for x in genes])
+        if max([len(x[1]) for x in genes]) - min([len(x[1]) for x in genes]) < options.maxgenes:
+            # Do stuff
+            ogenes.add(orth)
+            
+        # Upstream
+        if min([len(x[1].seq) for x in ups]) > options.minups:
+            # Do stuff
+            oupstreams.add(orth)
+        
+    print 'Core genes: %d'%len(ogenes)
+    print 'Core upstreams: %d'%len(oupstreams)
+    
+    print 'Creating core genes FASTA'
+
+    for orth in ogenes: 
+        locs = dp[orth]
+        f = open(os.path.join(options.outdir, 'genes_%s.fa'%orth), 'w')
+        for l in locs:
+            org = locorg[l]
+            f.write('>%s\n%s\n'%(org, dgenes[org][l]))
+        f.close()
+        
+    print 'Creating core upstreams FASTA'
+
+    for orth in oupstreams:
+        locs = dp[orth]
+        f = open(os.path.join(options.outdir, 'upstreams_%s.fa'%orth), 'w')
+        for l in locs:
+            org = uporg[l]
+            f.write('>%s\n%s\n'%(org, dups[org][l].seq))
+        f.close()
