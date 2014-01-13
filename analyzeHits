@@ -147,7 +147,7 @@ ax.fill_between(ireg, line-std_err, line+std_err)
 if options.genes:
     ipsilon = max(g)-(max(g)/float(10))
 else:
-    ipsilon = 0.9
+    ipsilon = 0.15
 if options.near is not None and not options.nonear:
     slope, intercept, n_r_value, n_p_value, std_err = stats.linregress(n_ireg, n_regz)
     line = slope*np.array(n_ireg)+intercept
@@ -169,7 +169,10 @@ if options.genes:
     ax.set_ylabel('Gene hits')
 else:
     ax.set_ylabel('Gene hits / Total hits')
-ax.legend(loc='best')
+if options.genes:
+    ax.legend(loc='upper left')
+else:
+    ax.legend(loc='best')
 ax.minorticks_on()
 ax.grid(b=True, which='major', linestyle='-', color='gray', axis='y')
 ax.grid(b=True, which='minor', linestyle='--', color='gray', axis='y')
