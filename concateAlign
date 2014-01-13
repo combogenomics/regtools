@@ -1,0 +1,29 @@
+#!/usr/bin/pypy
+
+import sys
+from Bio import SeqIO
+from Bio.Alphabet import DNAAlphabet
+import random
+
+if len(sys.argv) < 2:
+    print 'USAGE: ./concatenateAlign ALIGN_FASTA [...]'
+    sys.exit(1)
+
+files = sys.argv[1:]
+
+d = {}
+
+random.shuffle(files)
+
+for f in files:
+    print f
+    for s in SeqIO.parse(f, 'fasta'):
+        if s.id not in d:
+            d[s.id] = s
+        else:
+            d[s.id] += s
+
+for s in d.itervalues():
+    s.seq.alphabet = DNAAlphabet()
+
+SeqIO.write(d.values(), 'ALIGNMENT.nex', 'nexus') 
