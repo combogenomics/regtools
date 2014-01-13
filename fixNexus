@@ -1,0 +1,20 @@
+#!/usr/bin/pypy
+
+# Remove some annoying chars from the organism names in a NEXUS file
+
+import sys
+from Bio import SeqIO
+
+if len(sys.argv) < 2:
+    print 'USAGE: ./fixNexus NEXUSfile'
+    sys.exit(1)
+
+file = sys.argv[1]
+
+seqs = set()
+
+for s in SeqIO.parse(file, 'nexus'):
+    s.id = s.id.replace('-', '_')
+    seqs.add(s)
+
+SeqIO.write(seqs, '%s.new'%file, 'nexus') 
