@@ -1,0 +1,218 @@
+#!/usr/bin/pypy
+'''
+Create a regulatory network (pangenome centric)
+
+The network is saved in gml format
+'''
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Create a regulatory network (pangenome centric)")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('-r', metavar='reg2locus', action='store',
+                        dest='regloc',
+                        default=None,
+                        help='Regulator to locus_tag directory')
+    parser.add_argument('-o', '--operon', action="store",
+                        default=None,
+                        dest='operon',
+                        help='Operon directory')
+    parser.add_argument('-p', action="store",
+                        dest='pangenome',
+                        help='pangenome file')
+    parser.add_argument('-c', action="store",
+                        dest='pancategory',
+                        help='pangenome category file')
+    parser.add_argument('-t', action="store",
+                        dest='treshold',
+                        type=int,
+                        default=3,
+                        help='Methods treshold')
+    parser.add_argument('hitfiles', action='store', nargs='+',
+                            help='Regulatory hits files')
+    return parser.parse_args()
+
+options = getOptions()
+
+# PanGenome
+p = {}
+rp = {}
+for l in open(options.pangenome):
+    if l.strip().startswith('#'):continue
+    
+    orth, prot = l.strip().split('\t')
+    p[orth] = p.get(orth, set())
+    p[orth].add(prot)
+    
+    rp[prot] = orth
+
+# PanGenome category
+
+pc = {}
+for l in open(options.pancategory):
+    if l.strip().startswith('#'):continue
+    
+    orth, pkind, species = l.strip().split('\t')
+    orgs = species.split()
+    pc[orth] = pc.get(orth, ' '.join(sorted(orgs)))
+    
+
+import os
+
+import networkx as nx
+
+orgs = set()
+
+# Operons
+operons = {}
+op = nx.DiGraph()
+
+if options.operon is not None:
+    for f in os.listdir(options.operon):
+        if not f.endswith('.tab'):continue
+        org = f.split('.')[0]
+        orgs.add(org)
+        
+        operons[org] = {}
+        prev_opid = None
+        prev_gene = None
+        for l in open(os.path.join(options.operon, f)):
+            opid, gene = l.strip().split()
+            
+            if gene not in rp:
+                print '%s not found (operon), skipping'%gene
+                continue
+            orth = rp[gene]
+            
+            if orth not in op:
+                op.add_node(orth, weight=len(p[orth]))
+                op.node[orth]['graphics'] = {'w' : len(p[orth]),
+                                             'h' : len(p[orth])}
+            if prev_opid == opid:
+                if orth in op[prev_gene]:
+                    op[prev_gene][orth]['weight'] += 1
+                else:
+                    op.add_edge(prev_gene, orth, weight=1)
+            
+            operons[org][opid] = operons[org].get(opid, [])
+            operons[org][opid].append(gene)
+
+            prev_opid = opid
+            prev_gene = orth            
+
+regloc = {}
+regorg = {}
+absreg = set()
+for f in os.listdir(options.regloc):
+    if not f.endswith('.tab'):continue
+    org = f.split('.')[0]
+    orgs.add(org)
+    
+    regorg[org] = {}
+    for l in open(os.path.join(options.regloc, f)):
+        locus, reg = l.strip().split('\t')
+        
+        if locus == 'NA':
+            orth = 'NA'
+        else:
+            orth = rp[locus]
+            
+        regloc[reg] = regloc.get(reg, set())
+        regloc[reg].add(orth)
+        
+        regorg[org][reg] = regorg[org].get(reg, set())
+        regorg[org][reg].add(locus)
+
+# Remove the absent regulators
+absreg = set()
+for reg, orths in regloc.iteritems():
+    if len(orths) == 1 and 'NA' in orths:
+        absreg.add(reg)
+    if 'NA' in orths:
+        regloc[reg].remove('NA')
+for reg in absreg:
+    del regloc[reg]
+
+net = nx.DiGraph()
+
+def addOperon(g, op, net):
+    genes = nx.node_connected_component(op.to_undirected(), g)
+    for gene in genes:
+        for gene1 in op[gene]:
+            # Add if not present yet
+            if gene not in net:
+                net.add_node(gene, kind='operon', weight=len(p[gene]),
+                            orgs=pc[gene])
+                net.node[gene]['graphics'] = {'fill': '#2BA225',
+                                             'w' : len(p[gene]),
+                                             'h' : len(p[gene])}
+                
+            if gene1 not in net[gene]:
+                if gene1 not in net:
+                    net.add_node(gene1, kind='operon', weight=len(p[gene1]),
+                                orgs=pc[gene1])
+                    net.node[gene1]['graphics'] = {'fill': '#2BA225',
+                                             'w' : len(p[gene1]),
+                                             'h' : len(p[gene1])}
+                net.add_edge(gene, gene1, weight=op[gene][gene1]['weight'])
+
+for f in options.hitfiles:
+    reg = os.path.split(f)[-1].split('.')[0].split('_')[2]
+    org = os.path.split(f)[-1].split('.')[0].split('_')[1]
+    
+    if org not in orgs:continue
+    
+    if reg not in regloc:
+        print reg, org, 'NOT CONSIDERED'
+        continue
+    
+    print reg, org
+    
+    for rl in regloc[reg]:
+        net.add_node(rl, name=reg, weight=len(p[rl]), kind='regulator',
+                    orgs=pc[rl])
+        net.node[rl]['graphics'] = {'fill': '#C72D31',
+                                     'w' : len(p[rl]),
+                                     'h' : len(p[rl])}
+        
+        for l in open(f):
+            s = l.rstrip().split('\t')
+
+            if s[0] == '':
+                continue
+                
+            if int(s[9]) < options.treshold:
+                continue
+            
+            gene = s[0]
+            if gene not in rp:
+                print '%s not found, skipping'%gene
+                continue
+            gene = rp[s[0]]
+            weight = len(p[gene])
+            #dist = ( int(s[6])+int(s[7]) ) / 2.0
+             
+            if gene not in net.nodes():
+                net.add_node(gene, weight=weight, kind='regulated',
+                            orgs=pc[gene])
+                net.node[gene]['graphics'] = {'w' : len(p[gene]),
+                                             'h' : len(p[gene])}
+            
+            # Edge already present?
+            if gene in net[rl]:
+                # Added as an operon?
+                if net.node[gene]['kind'] == 'operon':
+                    del net.node[gene]['graphics']['fill']
+                    net.node[gene]['kind'] = 'regulated'
+                    net.node[gene]['orgs'] = pc[gene]
+                net[rl][gene]['weight'] += 1
+            else:
+                net.add_edge(rl, gene, weight=1)
+            
+            # Operons?
+            if gene in op.nodes():
+                addOperon(gene, op, net)
+
+nx.write_gml(net, 'pangenome.gml')
