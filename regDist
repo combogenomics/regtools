@@ -32,6 +32,17 @@ for x in filter(lambda x: n.node[x]['kind'] == 'regulator', n):
 
 # Distance matrix for the regulatory links
 for a, b in filter(lambda x: n[x[0]][x[1]]['kind'] == 'regulated', n.edges()):
+    # Check if this is a plug & play gene
+    regulator = len(n.node[a]['orgs'].split())
+    edge = len(n[a][b]['orgs'].split())
+    regulated = len(n.node[b]['orgs'].split())
+    
+    if edge > regulated:
+        raise ValueError('Found a regulator edge with more orgs than the regulated gene (%s --> %s)'%(a, b))
+    elif edge == regulated:
+        # Plug & play gene
+        continue
+
     orgz = set(n[a][b]['orgs'].split())
     for o in orgs:
         d[o] = d.get(o, [])
