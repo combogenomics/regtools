@@ -11,7 +11,19 @@ if len(sys.argv) < 2:
 infile = sys.argv[1]
 
 t = Phylo.read(infile, 'newick')
+
+d = {}
 for a, b in itertools.combinations(t.get_terminals(), 2):
     # Fix some names: Bio.Phylo treats numeric IDs as "confidence"
     # So its better to input a modified newick
-    print a.name.lstrip('_'), b.name.lstrip('_'), t.distance(a,b)
+    d[a.name.lstrip('_')] = d.get(a.name.lstrip('_'), {})
+    d[a.name.lstrip('_')][b.name.lstrip('_')] = t.distance(a,b)
+    
+    d[b.name.lstrip('_')] = d.get(b.name.lstrip('_'), {})
+    d[b.name.lstrip('_')][a.name.lstrip('_')] = t.distance(b,a)
+
+orgs = set(d.keys())
+
+print '\t'.join( [''] + sorted(orgs) )
+for o in sorted(orgs):
+    print '\t'.join( [o] + [str(d[o][o1]) if o1 in d[o] else 'nan' for o1 in sorted(orgs)] )
