@@ -1,0 +1,38 @@
+#!/usr/bin/python
+
+import sys
+from scipy.spatial.distance import jaccard
+
+if len(sys.argv) < 2:
+    print 'USAGE: ./dispDist PANGENOME_CATEGORY'
+    sys.exit(1)
+
+infile = sys.argv[1]
+        
+# Distance matrix for the orthologs presence
+d = {}
+orgs = set()
+for l in open(infile):
+    if l.lstrip().startswith('#'):continue
+    
+    orth, kind, orgz = l.strip().split('\t')
+    
+    if kind == 'core':continue
+    
+    d[orth] = set(orgz.split())
+    for o in orgz.split():
+        orgs.add(o)
+
+d1 = {}
+for orth, orgz in d.iteritems():
+    for o in orgs:
+        d1[o] = d1.get(o, [])
+        if o in orgz:
+            d1[o].append(1)
+        else:
+            d1[o].append(0)
+    
+# Print the distance matrix
+print '\t'.join( [''] + sorted(orgs) )
+for o in sorted(orgs):
+    print '\t'.join( [str(o)] + [str(jaccard(d1[o], d1[x])) for x in sorted(orgs)] )
