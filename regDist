@@ -2,6 +2,7 @@
 
 import sys
 import networkx as nx
+from scipy.spatial.distance import jaccard
 
 if len(sys.argv) < 2:
     print 'USAGE: ./regDist GML_FILE'
@@ -20,15 +21,27 @@ for x in n:
 d = {}
 r = set()
 for x in filter(lambda x: n.node[x]['kind'] == 'regulator', n):
-    d[x] = set(n.node[x]['orgs'].split())
+    orgz = set(n.node[x]['orgs'].split())
+    for o in orgs:
+        d[o] = d.get(o, [])
+        if o in orgz:
+            d[o].append(1)
+        else:
+            d[o].append(0)
     r.add(x)
 
 # Distance matrix for the regulatory links
 for a, b in filter(lambda x: n[x[0]][x[1]]['kind'] == 'regulated', n.edges()):
-    d['%s-%s'%(a,b)] = set(n[a][b]['orgs'].split())
+    orgz = set(n[a][b]['orgs'].split())
+    for o in orgs:
+        d[o] = d.get(o, [])
+        if o in orgz:
+            d[o].append(1)
+        else:
+            d[o].append(0)
     r.add( '%s-%s'%(a,b) )
     
 # Print the distance matrix
 print '\t'.join( [''] + sorted(orgs) )
-for c in r:                           
-    print '\t'.join( [str(c)] + ['1' if x in d[c] else '0' for x in sorted(orgs)] )
+for o in sorted(orgs):
+    print '\t'.join( [str(o)] + [str(jaccard(d[o], d[x])) for x in sorted(orgs)] )
