@@ -93,8 +93,10 @@ if options.operon is not None:
             if prev_opid == opid:
                 if orth in op[prev_gene]:
                     op[prev_gene][orth]['weight'] += 1
+                    op[prev_gene][orth]['orgs'].add(org)
                 else:
-                    op.add_edge(prev_gene, orth, weight=1)
+                    op.add_edge(prev_gene, orth, weight=1,
+                                orgs={org})
             
             operons[org][opid] = operons[org].get(opid, [])
             operons[org][opid].append(gene)
@@ -156,7 +158,8 @@ def addOperon(g, op, net):
                     net.node[gene1]['graphics'] = {'fill': '#2BA225',
                                              'w' : len(p[gene1]),
                                              'h' : len(p[gene1])}
-                net.add_edge(gene, gene1, weight=op[gene][gene1]['weight'])
+                net.add_edge(gene, gene1, weight=op[gene][gene1]['weight'],
+                            orgs=op[gene][gene1]['orgs'], kind='operon')
 
 for f in options.hitfiles:
     reg = os.path.split(f)[-1].split('.')[0].split('_')[2]
@@ -208,11 +211,18 @@ for f in options.hitfiles:
                     net.node[gene]['kind'] = 'regulated'
                     net.node[gene]['orgs'] = pc[gene]
                 net[rl][gene]['weight'] += 1
+                net[rl][gene]['orgs'].add(org)
+                net[rl][gene]['kind'] = 'regulated'
             else:
-                net.add_edge(rl, gene, weight=1)
+                net.add_edge(rl, gene, weight=1, orgs={org},
+                            kind='regulated')
             
             # Operons?
             if gene in op.nodes():
                 addOperon(gene, op, net)
+
+# Fix the "orgs" attribute
+for a, b in net.edges():
+    net[a][b]['orgs'] = ' '.join( sorted(net[a][b]['orgs']) )
 
 nx.write_gml(net, 'pangenome.gml')
