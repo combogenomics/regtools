@@ -1,0 +1,34 @@
+#!/usr/bin/python
+
+import sys
+import networkx as nx
+
+if len(sys.argv) < 2:
+    print 'USAGE: ./regDist GML_FILE'
+    sys.exit(1)
+
+infile = sys.argv[1]
+n = nx.read_gml(infile)
+
+# Grep the orgs in the net
+orgs = set()
+for x in n:
+    for o in n.node[x]['orgs'].split():
+        orgs.add(o)
+        
+# Distance matrix for the regulators presence
+d = {}
+r = set()
+for x in filter(lambda x: n.node[x]['kind'] == 'regulator', n):
+    d[x] = set(n.node[x]['orgs'].split())
+    r.add(x)
+
+# Distance matrix for the regulatory links
+for a, b in filter(lambda x: n[x[0]][x[1]]['kind'] == 'regulated', n.edges()):
+    d['%s-%s'%(a,b)] = set(n[a][b]['orgs'].split())
+    r.add( '%s-%s'%(a,b) )
+    
+# Print the distance matrix
+print '\t'.join( [''] + sorted(orgs) )
+for c in r:                           
+    print '\t'.join( [str(c)] + ['1' if x in d[c] else '0' for x in sorted(orgs)] )
