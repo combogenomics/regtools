@@ -1,0 +1,17 @@
+#!/usr/bin/python
+
+import sys
+from Bio import Phylo
+import itertools
+
+if len(sys.argv) < 2:
+    print 'USAGE: ./treeDist NEWICK_TREE'
+    sys.exit(1)
+
+infile = sys.argv[1]
+
+t = Phylo.read(infile, 'newick')
+for a, b in itertools.combinations(t.get_terminals(), 2):
+    # Fix some names: Bio.Phylo treats numeric IDs as "confidence"
+    # So its better to input a modified newick
+    print a.name.lstrip('_'), b.name.lstrip('_'), t.distance(a,b)
