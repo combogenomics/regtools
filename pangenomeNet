@@ -50,20 +50,22 @@ for l in open(options.pangenome):
 
 # PanGenome category
 
+orgs = set()
+
 pc = {}
 for l in open(options.pancategory):
     if l.strip().startswith('#'):continue
     
     orth, pkind, species = l.strip().split('\t')
-    orgs = species.split()
-    pc[orth] = pc.get(orth, ' '.join(sorted(orgs)))
+    orgz = species.split()
+    pc[orth] = pc.get(orth, ' '.join(sorted(orgz)))
     
-
+    for o in orgz:
+        orgs.add(o)
+    
 import os
 
 import networkx as nx
-
-orgs = set()
 
 # Operons
 operons = {}
@@ -73,7 +75,7 @@ if options.operon is not None:
     for f in os.listdir(options.operon):
         if not f.endswith('.tab'):continue
         org = f.split('.')[0]
-        orgs.add(org)
+        if org not in orgs:continue
         
         operons[org] = {}
         prev_opid = None
@@ -110,7 +112,7 @@ absreg = set()
 for f in os.listdir(options.regloc):
     if not f.endswith('.tab'):continue
     org = f.split('.')[0]
-    orgs.add(org)
+    if org not in orgs:continue
     
     regorg[org] = {}
     for l in open(os.path.join(options.regloc, f)):
@@ -165,7 +167,9 @@ for f in options.hitfiles:
     reg = os.path.split(f)[-1].split('.')[0].split('_')[2]
     org = os.path.split(f)[-1].split('.')[0].split('_')[1]
     
-    if org not in orgs:continue
+    if org not in orgs:
+        print reg, org, 'NOT CONSIDERED (org not in the list)'
+        continue
     
     if reg not in regloc:
         print reg, org, 'NOT CONSIDERED'
