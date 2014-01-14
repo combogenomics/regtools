@@ -26,4 +26,4 @@ orgs = set(d.keys())
 
 print '\t'.join( [''] + sorted(orgs) )
 for o in sorted(orgs):
-    print '\t'.join( [o] + [str(d[o][o1]) if o1 in d[o] else 'nan' for o1 in sorted(orgs)] )
+    print '\t'.join( [o] + [str(d[o][o1]) if o1 in d[o] else '0' for o1 in sorted(orgs)] )
