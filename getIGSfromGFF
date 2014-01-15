@@ -1,0 +1,82 @@
+#!/usr/bin/pypy
+
+import sys
+import os
+import re
+from Bio import SeqIO
+
+if len(sys.argv) < 3:
+    print('USAGE: getIGS GBK GFF')
+    sys.exit(65)
+
+# rRNA magic regex
+regex = '(.*)16[sS]|(.*)23[sS]'    
+prog = re.compile(regex)
+
+print('Using /%s/ regex search'%regex)
+print('')
+
+gbk = sys.argv[1]
+gff = sys.argv[2]
+
+# Parsing the gff
+print('Reading %s'%gff)
+
+d = {}
+for l in open(gff):
+    if l.lstrip().startswith('#'):
+        continue
+    
+    s = l.strip().split('\t')
+    
+    d[s[0]] = d.get(s[0], [])
+    d[s[0]].append( (int(s[3]), int(s[4]), s[6], s[8]) )
+
+print('Reading %s'%gbk)
+print('')
+
+i = 0
+rseqs = []
+
+org = gbk.split('.')[0]
+
+for s in SeqIO.parse(gbk, 'genbank'):
+    if s.id not in d:continue
+    
+    rRNA = sorted(d[s.id], key=lambda x: x[0])
+    for f, f1 in zip(rRNA, rRNA[1:]):
+        # Are we between 16s and 23s?
+        if not prog.match(f[3]) or not prog.match(f1[3]):
+            continue
+            
+        #print f.qualifiers['product'][0], f1.qualifiers['product'][0]
+ 
+        # We suppose they should be in the same strand, right?
+        if f[2] != f1[2]:
+            continue
+            
+        # Check that the two features are not so distant from each other
+        dist = f1[0] - f[1]
+        if dist > 30000:
+            print('Suspicious long IGS (%d)'%(dist))
+ 
+        i += 1
+        rid = '%s_%d'%(org, i)
+        
+        rseq = s[f[1]+1 : f1[0]-1]
+        if f[2] == '-':
+            rseq = rseq.reverse_complement()
+            rseq.description = '(%s, %d, %d, -)'%(s.id,
+                f[1]+1, f1[0]-1)
+        else:
+            rseq.description = '(%s, %d, %d, +)'%(s.id,
+                f[1]+1, f1[0]-1)    
+        rseq.id = rid
+        
+        rseqs.append(rseq)
+        
+if len(rseqs) == 0:
+    print ('No IGS found for %s'%org)
+else:
+    print('Found %d IGS in %s'%(len(rseqs), org))
+    SeqIO.write(rseqs, '%s.rna.fna'%org, 'fasta')
