@@ -16,11 +16,14 @@ d = {}
 for a, b in itertools.combinations(t.get_terminals(), 2):
     # Fix some names: Bio.Phylo treats numeric IDs as "confidence"
     # So its better to input a modified newick
-    d[a.name.lstrip('_')] = d.get(a.name.lstrip('_'), {})
-    d[a.name.lstrip('_')][b.name.lstrip('_')] = t.distance(a,b)
+    a.name = a.name.replace('CHANGETHIS', '-').replace('REMOVETHIS', '')
+    b.name = b.name.replace('CHANGETHIS', '-').replace('REMOVETHIS', '')
+
+    d[a.name] = d.get(a.name, {})
+    d[a.name][b.name] = t.distance(a,b)
     
-    d[b.name.lstrip('_')] = d.get(b.name.lstrip('_'), {})
-    d[b.name.lstrip('_')][a.name.lstrip('_')] = t.distance(b,a)
+    d[b.name] = d.get(b.name, {})
+    d[b.name][a.name] = t.distance(b,a)
 
 orgs = set(d.keys())
 

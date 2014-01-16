@@ -1,0 +1,32 @@
+#!/usr/bin/pypy
+
+import sys
+from Bio import SeqIO
+from Bio.Alphabet import DNAAlphabet
+
+if len(sys.argv) < 2:
+    print 'USAGE: ./concatenateAlign ALIGN_FASTA'
+    sys.exit(1)
+
+infile = sys.argv[1]
+
+d = {}
+
+for s in SeqIO.parse(infile, 'fasta'):
+    # Fix some nexus and newick format odd things
+    if '-' in s.id:
+        s.id = s.id.replace('-', 'CHANGETHIS')
+    try:
+        int(s.id)
+        s.id = 'REMOVETHIS%s'%s.id
+    except:pass
+
+    if s.id not in d:
+        d[s.id] = s
+    else:
+        d[s.id] += s
+
+for s in d.itervalues():
+    s.seq.alphabet = DNAAlphabet()
+
+SeqIO.write(d.values(), '%s.nex'%infile, 'nexus') 

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [ "$#" -lt 1 ]; then
+    echo 'nexus2MrBayes NEXUS'
+    exit 65
+fi
+
+NEXUS=$1
+
+sed -ie ':a;N;$!ba;s/end\;/mcmc\;\nsumt\;\nend\;/' $NEXUS
