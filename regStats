@@ -1,0 +1,139 @@
+#!/usr/bin/python
+
+import sys
+import networkx as nx
+import numpy as np
+
+if len(sys.argv) < 2:
+    print 'USAGE: ./regStats GML_FILE'
+    sys.exit(1)
+
+class RegLink(object):
+    header = '\t'.join( ('Regulator', 'Gene', '# orgs',
+                        'Plugged', 'Unplugged', 'Ready',
+                        'Not ready', 'Absent') )
+
+    def __init__(self, source, target, norgs):
+        self.regulator = source
+        self.gene = target
+        self.norgs = norgs
+        self.plugged = 0.
+        self.unplugged = 0.
+        self.ready = 0.
+        self.notready = 0.
+        self.absent = 0.
+        
+    def _sumAll(self):
+        return sum( (self.plugged,
+                   self.unplugged,
+                   self.ready,
+                   self.notready,
+                   self.absent) )
+        
+    def __str__(self):
+        return '\t'.join( [str(x)
+                           for x in ( self.regulator, self.gene,
+                                       self.norgs, round(self.plugged,2),
+                                       round(self.unplugged,2),
+                                       round(self.ready,2),
+                                       round(self.notready,2),
+                                       round(self.absent,2),)])
+
+def getMean(objs, attr):
+    return np.array( [getattr(x, attr) for x in objs] ).mean()
+ 
+infile = sys.argv[1]
+n = nx.read_gml(infile)
+
+# Grep the orgs in the net
+orgs = set()
+for x in n:
+    for o in n.node[x]['orgs'].split():
+        orgs.add(o)
+norg = len(orgs)
+
+# Inspect the proportion of conserved and variable regulatory links
+regulators = filter(lambda x: n.node[x]['kind'] == 'regulator', n.nodes())
+reglinks = filter(lambda x: n[x[0]][x[1]]['kind'] == 'regulated',
+                        n.edges())
+
+v = set()
+unattended = set()
+
+for a, b in reglinks:
+    #rorgs = reg.union(prom).union(gene)
+    
+    r = RegLink(n.node[a]['label'], n.node[b]['label'], norg)
+    
+    # Number of orgs in which the regulator, the promoter and the gene are present
+    reg = set(n.node[a]['orgs'].split())
+    
+    prom = set(n[a][b]['orgs'].split())
+    
+    gene = set(n.node[b]['orgs'].split())
+    
+    # Sanity check: promoter cannot be a superset of genes, only a subset
+    if prom.issuperset(gene) and not prom.issubset(gene):
+        raise ValueError('Found a regulator edge with more orgs than the regulated gene (%s --> %s)'%(a, b))
+
+    # r/p/g
+    plugged = 0
+    # r/ /g
+    unplugged = 0
+    #  /p/g
+    ready = 0
+    #  / /g
+    notready = 0
+    # r/ / 
+    #  / / 
+    absent = 0    
+
+    for o in orgs:
+        if o in reg and o in prom and o in gene:
+            plugged += 1
+        elif o in reg and o not in prom and o in gene:
+            unplugged += 1
+        elif o not in reg and o in prom and o in gene:
+            ready += 1
+        elif o not in reg and o not in prom and o in gene:
+            notready += 1
+        elif o in reg and o not in prom and o not in gene:
+            absent += 1
+        elif o not in reg and o not in prom and o not in gene:
+            absent += 1
+        else:
+            print('Unattended case (%s --> %s // %s - %s - %s)'%(a, b,
+                                                o in reg,
+                                                o in prom,
+                                                o in gene))
+            unattended.add( (o in reg,
+                            o in prom,
+                            o in gene) )
+    
+    r.plugged = float(plugged)/r.norgs
+    r.unplugged = float(unplugged)/r.norgs
+    r.ready = float(ready)/r.norgs
+    r.notready = float(notready)/r.norgs
+    r.absent = float(absent)/r.norgs
+    
+    v.add( r )
+
+b = True    
+for r in v:
+    if b:
+        print(r.header)
+        b = False
+    print(str(r))
+
+#if len(unattended) > 0:   
+#    for u in unattended:
+#        print(u)
+        
+#print('\t'.join( ('# links', 'Plugged', 'Unplugged', 'Ready', 'Not ready',
+#                'Absent') ))
+#print('\t'.join( [str(x) for x in (len(reglinks),
+#                getMean(v, 'plugged'),
+#                getMean(v, 'unplugged'),
+#                getMean(v, 'ready'),
+#                getMean(v, 'notready'),
+#                getMean(v, 'absent')) ]))
