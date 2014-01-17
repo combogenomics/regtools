@@ -1,0 +1,46 @@
+#!/usr/bin/python
+
+import sys
+import numpy as np
+
+if len(sys.argv) < 2:
+    print 'USAGE: ./combineDists DIST_FILE [...]'
+    sys.exit(1)
+
+files = sys.argv[1:]
+
+def readDist(infile):
+    b = True
+    
+    d = {}
+    for l in open(infile):
+        s = l.rstrip().split('\t')
+        
+        if b:
+            orgs = s[1:]
+            b = False
+            continue
+        
+        o = s[0]
+        values = s[1:]
+        d[o] = d.get(o, {})
+        for x in orgs:
+            d[o][x] = float( values[orgs.index(x)] )
+            
+    return d
+
+d = {}
+for f in files:
+    t = readDist(f)
+    
+    for o in t:
+        d[o] = d.get(o, {})
+        for o1 in t[o]:
+            d[o][o1] = d[o].get(o1, [])
+            d[o][o1].append(t[o][o1])
+            
+orgs = set(d.keys())
+
+print '\t'.join( [''] + sorted(orgs) )
+for o in sorted(orgs):
+    print '\t'.join( [o] + [str(round(np.array(d[o][o1]).mean(),5)) if o1 in d[o] else '0' for o1 in sorted(orgs)] )
