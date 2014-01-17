@@ -5,10 +5,14 @@ if [ "$#" -lt 1 ]; then
     exit 65
 fi
 
-./fasta2Nexus $1
-./nexus2MrBayes $1.nex
-mb $1.nex > $1.log
-./mrBayes2Newick_3.2 $1.nex.con.tre
-./treeDist $1.nex.con.tre.nwk > $1.dist
+die () {
+	exit 1
+}
+
+./fasta2Nexus $1 || die
+./nexus2MrBayes $1.nex || die
+mb $1.nex > $1.log || die
+./mrBayes2Newick_3.2 $1.nex.con.tre || die
+./treeDist $1.nex.con.tre.nwk > $1.dist || die
 
 

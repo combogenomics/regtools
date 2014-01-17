@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # IMPORTANT! we assume that MrBayes produces a *.con file
-# Some newer versions produce a different tree file
+# Some newer versions produce a different tree file (this works for 3.1.2)
 
 import sys
 
