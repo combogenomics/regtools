@@ -60,14 +60,14 @@ operons = set()
 
 nodes = nx.depth_first_search.dfs_successors(net, snode)
 for n in nodes:
-    if 'operon' in net.node[n]:
+    if net.node[n]['kind'] == 'operon':
         operons.add(n)
     else:
         genes.add(n)
 
     downstream.add(n)
     for n1 in nodes[n]:
-        if 'operon' in net.node[n1]:
+        if net.node[n1]['kind'] == 'operon':
             operons.add(n1)
         else:
             genes.add(n1)
