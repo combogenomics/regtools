@@ -58,7 +58,7 @@ for l in open(infile):
         s = nwk2.split(',')
         for i in s:
             i=i.strip()
-            if i.startswith('('):
+            if i.lstrip().startswith('('):
                 nwk3 += '('
                 i = i.lstrip('(')
             j = i.split(':')
@@ -80,7 +80,7 @@ for l in open(infile):
                 nwk4 += ':' + str(round(float(j[0]),6)) + ')' + ')'.join(j[1:])
         #
         
-        nwk = nwk4
+        nwk = nwk2
         
         break
 
