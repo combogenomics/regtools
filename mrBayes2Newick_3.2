@@ -1,0 +1,93 @@
+#!/usr/bin/python
+
+# IMPORTANT! we assume that MrBayes produces a *.con file
+# Some newer versions produce a different tree file (this works for 3.2.x)
+
+import sys
+
+if len(sys.argv) < 2:
+    print 'USAGE: ./mrBayes2Newick_3.2 CON_FILE'
+    sys.exit(1)
+
+infile = sys.argv[1]
+
+trigger_translate = 'translate'
+
+trigger = 'tree con_50_majrule = '
+
+bStart = True
+bTrans = False
+nwk = None
+
+d = {}
+
+for l in open(infile):
+    l = l.strip()
+
+    # ID conversion
+    if not l.startswith(trigger_translate) and bStart:
+        
+        continue
+    elif l.startswith(trigger_translate) and bStart:
+        
+        bStart = False
+        bTrans = True
+        continue
+    elif bTrans:
+        
+        if l.rstrip().lstrip() == ';':
+            bTrans = False
+            continue
+        oid, org = l.rstrip(',').split('\t')
+        d[oid] = org
+    elif l.startswith(trigger):
+        
+        nwk1 = l.split(trigger)[1]
+        
+        # Fix the tree
+        nwk2 = ''
+        s = nwk1.split('[')
+        for i in s:
+            if ']' in i:
+                nwk2 += i.split(']')[1]
+            else:
+                nwk2 += i
+        #
+        # Fix the clade names
+        nwk3 = ''
+        s = nwk2.split(',')
+        for i in s:
+            i=i.strip()
+            if i.startswith('('):
+                nwk3 += '('
+                i = i.lstrip('(')
+            j = i.split(':')
+            nwk3 += d[j[0]] + ':'
+            nwk3 += ':'.join(j[1:])
+            nwk3 += ','
+        nwk3 = nwk3.rstrip(',')
+        #
+        # Fix the distance
+        nwk4 = ''
+        s = nwk3.split(':')
+        nwk4 += s[0]
+        for i in s[1:]:
+            if ',' in i:
+                j = i.split(',')
+                nwk4 += ':' + str(round(float(j[0]),6)) + ',' + ','.join(j[1:])
+            else:
+                j = i.split(')')
+                nwk4 += ':' + str(round(float(j[0]),6)) + ')' + ')'.join(j[1:])
+        #
+        
+        nwk = nwk4
+        
+        break
+
+if nwk is None:
+    raise ValueError('No nwk tree!')
+
+f = open('%s.nwk'%infile, 'w')
+f.write('%s\n'%nwk)
+f.close()
+ 

@@ -1,0 +1,14 @@
+#!/bin/bash
+
+if [ "$#" -lt 1 ]; then
+    echo 'doGenomicDist_3.2 ALIGNMENT'
+    exit 65
+fi
+
+./fasta2Nexus $1
+./nexus2MrBayes $1.nex
+mb $1.nex > $1.log
+./mrBayes2Newick_3.2 $1.nex.con.tre
+./treeDist $1.nex.con.tre.nwk > $1.dist
+
+
