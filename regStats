@@ -4,20 +4,33 @@ import sys
 import networkx as nx
 import numpy as np
 
-if len(sys.argv) < 2:
-    print 'USAGE: ./regStats GML_FILE'
-    sys.exit(1)
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Statistics on pangenome scale regulatory networks")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('GML_FILE', action='store',
+                            help='Distant matrices')
+    parser.add_argument('-A', '--average', action="store_true",
+            default=False,
+            dest='average',
+            help='Average values (with mean absolute deviation)')
+    return parser.parse_args()
+
+options = getOptions()
 
 class RegLink(object):
     header = '\t'.join( ('Regulator', 'Gene', '# orgs',
                         'Plugged', 'Unplugged', 'Ready',
-                        'Not ready', 'Absent') )
+                        'Not ready', 'Absent', 'Plug length') )
 
     def __init__(self, source, target, norgs):
         self.regulator = source
         self.gene = target
         self.norgs = norgs
         self.plugged = 0.
+        self.pluglen = 0.
         self.unplugged = 0.
         self.ready = 0.
         self.notready = 0.
@@ -37,12 +50,33 @@ class RegLink(object):
                                        round(self.unplugged,2),
                                        round(self.ready,2),
                                        round(self.notready,2),
-                                       round(self.absent,2),)])
+                                       round(self.absent,2),
+                                       round(self.pluglen,2))])
 
 def getMean(objs, attr):
     return np.array( [getattr(x, attr) for x in objs] ).mean()
- 
-infile = sys.argv[1]
+    
+def getMad(objs, attr):
+    data = np.array([getattr(x, attr) for x in objs])
+    return np.median( np.absolute(data - np.median(data)))
+
+def getPlugLen(net, node, org):
+    # Extract the DFS tree
+    tree = nx.depth_first_search.dfs_tree(net, node)
+    
+    # Prune the DFS tree
+    for a, b in tree.edges():
+        orgs = n[a][b]['orgs'].split()
+        
+        if org not in orgs:
+            del tree[a][b]
+    
+    # To another DFS on the pruned tree
+    tree = nx.depth_first_search.dfs_tree(tree, node)
+    
+    return len(tree.edges())
+
+infile = options.GML_FILE
 n = nx.read_gml(infile)
 
 # Grep the orgs in the net
@@ -78,6 +112,8 @@ for a, b in reglinks:
 
     # r/p/g
     plugged = 0
+    # Plug length
+    pluglen = []
     # r/ /g
     unplugged = 0
     #  /p/g
@@ -86,11 +122,14 @@ for a, b in reglinks:
     notready = 0
     # r/ / 
     #  / / 
-    absent = 0    
+    absent = 0
 
     for o in orgs:
         if o in reg and o in prom and o in gene:
             plugged += 1
+            # It is plugged, we want to know also the plug-length
+            # That is the number of downstream genes
+            pluglen.append( getPlugLen(n, b, o) )
         elif o in reg and o not in prom and o in gene:
             unplugged += 1
         elif o not in reg and o in prom and o in gene:
@@ -111,6 +150,10 @@ for a, b in reglinks:
                             o in gene) )
     
     r.plugged = float(plugged)/r.norgs
+    
+    if len(pluglen) != 0:
+        r.pluglen  = np.array(pluglen).mean()
+    
     r.unplugged = float(unplugged)/r.norgs
     r.ready = float(ready)/r.norgs
     r.notready = float(notready)/r.norgs
@@ -118,22 +161,31 @@ for a, b in reglinks:
     
     v.add( r )
 
-b = True    
-for r in v:
-    if b:
-        print(r.header)
-        b = False
-    print(str(r))
+if not options.average:
+    b = True    
+    for r in v:
+        if b:
+            print(r.header)
+            b = False
+        print(str(r))
 
 #if len(unattended) > 0:   
 #    for u in unattended:
 #        print(u)
-        
-#print('\t'.join( ('# links', 'Plugged', 'Unplugged', 'Ready', 'Not ready',
-#                'Absent') ))
-#print('\t'.join( [str(x) for x in (len(reglinks),
-#                getMean(v, 'plugged'),
-#                getMean(v, 'unplugged'),
-#                getMean(v, 'ready'),
-#                getMean(v, 'notready'),
-#                getMean(v, 'absent')) ]))
+else:
+    print('\t'.join( ('# links', 'Plugged', 'Unplugged', 'Ready', 'Not ready',
+                    'Absent', 'Plug length') ))
+    print('\t'.join( [str(x) for x in (len(reglinks),
+                    getMean(v, 'plugged'),
+                    getMean(v, 'unplugged'),
+                    getMean(v, 'ready'),
+                    getMean(v, 'notready'),
+                    getMean(v, 'absent'),
+                    getMean(v, 'pluglen')) ]))
+    print('\t'.join( [str(x) for x in (len(reglinks),
+                    getMad(v, 'plugged'),
+                    getMad(v, 'unplugged'),
+                    getMad(v, 'ready'),
+                    getMad(v, 'notready'),
+                    getMad(v, 'absent'),
+                    getMad(v, 'pluglen')) ]))
