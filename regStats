@@ -165,7 +165,7 @@ if not options.average:
     b = True    
     for r in v:
         if b:
-            print(r.header)
+            print('#' + r.header)
             b = False
         print(str(r))
 
