@@ -2,12 +2,25 @@
 
 import sys
 import numpy as np
+from scipy import stats
 
-if len(sys.argv) < 2:
-    print 'USAGE: ./combineDists DIST_FILE [...]'
-    sys.exit(1)
+def getOptions():
+    import argparse
 
-files = sys.argv[1:]
+    # create the top-level parser
+    description = ("Takes a bunch of distance matrices and outputs the average")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('DIST_FILE', action='store', nargs='+',
+                            help='Distant matrices')
+    parser.add_argument('-E', '--error', action="store_true",
+            default=False,
+            dest='error',
+            help='Compute the standard error of the values')
+    return parser.parse_args()
+
+options = getOptions()
+
+files = options.DIST_FILE
 
 def readDist(infile):
     b = True
@@ -43,4 +56,7 @@ orgs = set(d.keys())
 
 print '\t'.join( [''] + sorted(orgs) )
 for o in sorted(orgs):
-    print '\t'.join( [o] + [str(round(np.array(d[o][o1]).mean(),5)) if o1 in d[o] else '0' for o1 in sorted(orgs)] )
+    if options.error:
+        print('\t'.join( [o] + [str(round(stats.sem(np.array(d[o][o1])),5)) if o1 in d[o] else '0' for o1 in sorted(orgs)] ))
+    else:
+        print('\t'.join( [o] + [str(round(np.array(d[o][o1]).mean(),5)) if o1 in d[o] else '0' for o1 in sorted(orgs)] ))    
