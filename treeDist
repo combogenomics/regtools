@@ -10,7 +10,12 @@ if len(sys.argv) < 2:
 
 infile = sys.argv[1]
 
-t = Phylo.read(infile, 'newick')
+try:
+    t = Phylo.read(infile, 'newick')
+except Phylo.NewickIO.NewickError, e:
+    #sys.stderr.write('%s\n'%infile)
+    sys.stderr.write('Could not read tree %s (%s)\n'%(infile, e))
+    sys.exit(1)
 
 d = {}
 for a, b in itertools.combinations(t.get_terminals(), 2):
@@ -29,4 +34,4 @@ orgs = set(d.keys())
 
 print '\t'.join( [''] + sorted(orgs) )
 for o in sorted(orgs):
-    print '\t'.join( [o] + [str(d[o][o1]) if o1 in d[o] else '0' for o1 in sorted(orgs)] )
+    print('\t'.join( [o] + [str(d[o][o1]) if o1 in d[o] else '0' for o1 in sorted(orgs)] ))
