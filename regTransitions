@@ -1,0 +1,126 @@
+#!/usr/bin/python
+
+import sys
+import networkx as nx
+import numpy as np
+import itertools
+from regtools.regnet import *
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Statistics on pangenome scale regulatory networks")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('GML_FILE', action='store',
+                            help='Pangenome regulatory network')
+    return parser.parse_args()
+
+options = getOptions()
+
+infile = options.GML_FILE
+n = nx.read_gml(infile)
+
+# Grep the orgs in the net
+orgs = set()
+for x in n:
+    for o in n.node[x]['orgs'].split():
+        orgs.add(o)
+norg = len(orgs)
+
+# Inspect the proportion of conserved and variable regulatory links
+regulators = filter(lambda x: n.node[x]['kind'] == 'regulator', n.nodes())
+reglinks = filter(lambda x: n[x[0]][x[1]]['kind'] == 'regulated',
+                        n.edges())
+
+class RegTrans(object):
+    def __init__(self, o1, o2):
+        self.org1 = o1
+        self.org2 = o2
+        
+        self.transitions = {}
+        self.conserved = 0.
+        self.plugdiff = 0.
+        self.plugdiffmad = 0.
+
+# Save some time, precompute some stats
+drlinks = {}
+for a, b in reglinks:
+    # Number of orgs in which the regulator, the promoter and the gene are present
+    reg = set(n.node[a]['orgs'].split())
+            
+    prom = set(n[a][b]['orgs'].split())
+        
+    gene = set(n.node[b]['orgs'].split())
+
+    # Sanity check: promoter cannot be a superset of genes, only a subset
+    if prom.issuperset(gene) and not prom.issubset(gene):
+        raise ValueError('Found a regulator edge with more orgs than the regulated gene (%s --> %s)'%(a, b))
+        
+    drlinks[a] = drlinks.get(a, {})
+    drlinks[a][b] = (reg, prom, gene)
+      
+z = set()
+        
+i = 0
+for o1, o2 in itertools.combinations(sorted(orgs), 2):
+    i += 1
+    sys.stderr.write('%d - %s - %s\n'%(i, o1, o2))
+
+    conserved = 0
+    trans = {}
+    
+    for a, b in getRegStatesCombinations():
+        trans[a] = trans.get(a, {})
+        trans[a][b] = 0
+    
+    plugdiffs = []
+
+    r = RegTrans(o1, o2)
+
+    for a, b in reglinks: 
+        state1 = getRegState(o1, drlinks[a][b][0], drlinks[a][b][1],
+                                 drlinks[a][b][2])
+        state2 = getRegState(o2, drlinks[a][b][0], drlinks[a][b][1],
+                                 drlinks[a][b][2])
+        
+        if state1 == state2:
+            conserved += 1
+            
+            if state1 == 'plugged':
+                # Compare plugs!
+                p1 = set(getPlug(n, b, o1))
+                p2 = set(getPlug(n, b, o2))
+                
+                if len(p1.union(p2)) == 0:
+                    continue
+                
+                plugdiffs.append(
+                    len(p1.difference(p2).union(p2.difference(p1))) / float(len(p1.union(p2)))
+                    )
+        else:
+            st = sorted( [state1, state2] )
+            trans[st[0]][st[1]] += 1
+            
+    r.conserved = conserved/float(len(reglinks))
+    for k, v in trans.iteritems():
+        r.transitions[k] = {}
+        for k1, v1 in v.iteritems():
+            r.transitions[k][k1] = v1/float(len(reglinks))
+    # data
+    data = np.array(plugdiffs)
+    r.plugdiff = data.mean()
+    r.plugdiffmad = np.median( np.absolute(data - np.median(data)))
+    
+    z.add(r)
+
+print('#' + '\t'.join( ['Organism 1', 'Organism 2', '# links', 'Conserved']
+                + ['%s <==> %s'%(a,b) for a,b in getRegStatesCombinations()] +
+                ['Plug diff', 'Plug diff MAD'] ))
+
+for r in z:
+    print('\t'.join( [str(x) for x in [r.org1, r.org2,
+                    len(reglinks),
+                    r.conserved] +
+                    [r.transitions[a][b] for a,b in getRegStatesCombinations()]
+                    + [r.plugdiff, r.plugdiffmad] ]))
