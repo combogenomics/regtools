@@ -1,0 +1,25 @@
+#!/usr/bin/Rscript
+
+library('vegan')
+r=read.table('REG.dist', header=T, row.names=1, check.names=F)
+g=read.table('GENES.dist', header=T, row.names=1, check.names=F)
+u=read.table('UPSTREAMS.dist', header=T, row.names=1, check.names=F)
+d=read.table('DISPENSABLE.dist', header=T, row.names=1, check.names=F)
+
+gr=mantel(g,r, permutations=9999)
+ur=mantel(u,r, permutations=9999)
+dr=mantel(d,r, permutations=9999)
+
+gu=mantel(g,u, permutations=9999)
+ud=mantel(u,d, permutations=9999)
+gd=mantel(g,d, permutations=9999)
+
+a = data.frame(Name="Genes/Reg", r=gr$statistic, p=gr$signif)
+b = data.frame(Name="Upstreams/Reg", r=ur$statistic, p=ur$signif)
+c = data.frame(Name="Dispensable/Reg", r=dr$statistic, p=dr$signif)
+
+d = data.frame(Name="Genes/Upstreams", r=gu$statistic, p=gu$signif)
+e = data.frame(Name="Genes/Dispensable", r=gd$statistic, p=gd$signif)
+f = data.frame(Name="Upstreams/Dispensable", r=ud$statistic, p=ud$signif)
+
+write.table(rbind(a, b, c, d, e, f), 'MANTEL.txt', quote=F, sep='\t', row.names=F)
