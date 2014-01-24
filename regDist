@@ -2,13 +2,24 @@
 
 import sys
 import networkx as nx
-from scipy.spatial.distance import jaccard
 
-if len(sys.argv) < 2:
-    print 'USAGE: ./regDist GML_FILE'
-    sys.exit(1)
+def getOptions():
+    import argparse
 
-infile = sys.argv[1]
+    # create the top-level parser
+    description = ("Org-to-org distance on pangenome scale regulatory networks")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('GML_FILE', action='store',
+                            help='Pangenome regulatory network')
+    parser.add_argument('-B', '--babu-dist', action="store_true",
+            default=False,
+            dest='babudist',
+            help='Compute the distances as Babu et al., 2006 (doi:10.1016/j.jmb.2006.02.019)')
+    return parser.parse_args()
+
+options = getOptions()
+
+infile = options.GML_FILE
 n = nx.read_gml(infile)
 
 # Grep the orgs in the net
@@ -16,48 +27,89 @@ orgs = set()
 for x in n:
     for o in n.node[x]['orgs'].split():
         orgs.add(o)
+
+if not options.babudist:
+    from scipy.spatial.distance import jaccard
+   
+    # Distance matrix for the regulators presence
+    d = {}
+    r = set()
+    for x in filter(lambda x: n.node[x]['kind'] == 'regulator', n):
+        orgz = set(n.node[x]['orgs'].split())
+        for o in orgs:
+            d[o] = d.get(o, [])
+            if o in orgz:
+                d[o].append(1)
+            else:
+                d[o].append(0)
+        r.add(x)
+
+    # Distance matrix for the regulatory links
+    for a, b in filter(lambda x: n[x[0]][x[1]]['kind'] == 'regulated', n.edges()):
+        # Check if this is a plug & play gene
+        regulator = len(n.node[a]['orgs'].split())
+        ro = set(n.node[a]['orgs'].split())
         
-# Distance matrix for the regulators presence
-d = {}
-r = set()
-for x in filter(lambda x: n.node[x]['kind'] == 'regulator', n):
-    orgz = set(n.node[x]['orgs'].split())
-    for o in orgs:
-        d[o] = d.get(o, [])
-        if o in orgz:
-            d[o].append(1)
-        else:
-            d[o].append(0)
-    r.add(x)
+        edge = len(n[a][b]['orgs'].split())
+        eo = set(n[a][b]['orgs'].split())
+        
+        regulated = len(n.node[b]['orgs'].split())
+        reo = set(n.node[b]['orgs'].split())
+        
+        if eo != reo and eo.issuperset(reo) and reo.issubset(eo):
+            raise ValueError('Found a regulator edge with more orgs than the regulated gene (%s --> %s)'%(a, b))
+        elif edge == regulated and eo == reo:
+            # Plug & play gene
+            continue
 
-# Distance matrix for the regulatory links
-for a, b in filter(lambda x: n[x[0]][x[1]]['kind'] == 'regulated', n.edges()):
-    # Check if this is a plug & play gene
-    regulator = len(n.node[a]['orgs'].split())
-    ro = set(n.node[a]['orgs'].split())
-    
-    edge = len(n[a][b]['orgs'].split())
-    eo = set(n[a][b]['orgs'].split())
-    
-    regulated = len(n.node[b]['orgs'].split())
-    reo = set(n.node[b]['orgs'].split())
-    
-    if eo != reo and eo.issuperset(reo) and reo.issubset(eo):
-        raise ValueError('Found a regulator edge with more orgs than the regulated gene (%s --> %s)'%(a, b))
-    elif edge == regulated and eo == reo:
-        # Plug & play gene
-        continue
+        orgz = set(n[a][b]['orgs'].split())
+        for o in orgs:
+            d[o] = d.get(o, [])
+            if o in orgz:
+                d[o].append(1)
+            else:
+                d[o].append(0)
+        r.add( '%s-%s'%(a,b) )
+        
+    # Print the distance matrix
+    print '\t'.join( [''] + sorted(orgs) )
+    for o in sorted(orgs):
+        print '\t'.join( [str(o)] + [str(jaccard(d[o], d[x])) for x in sorted(orgs)] )
 
-    orgz = set(n[a][b]['orgs'].split())
-    for o in orgs:
-        d[o] = d.get(o, [])
-        if o in orgz:
-            d[o].append(1)
-        else:
-            d[o].append(0)
-    r.add( '%s-%s'%(a,b) )
+else:
+    from itertools import combinations
+
+    d = {}
     
-# Print the distance matrix
-print '\t'.join( [''] + sorted(orgs) )
-for o in sorted(orgs):
-    print '\t'.join( [str(o)] + [str(jaccard(d[o], d[x])) for x in sorted(orgs)] )
+    for o in orgs:
+        d[o] = {}
+        d[o][o] = 0.
+    
+    for a,b in combinations(orgs, 2):
+        d[a] = d.get(a, {})
+        d[b] = d.get(b, {})
+        
+        core = len(
+                filter(lambda (x, y):
+                      n[x][y]['kind'] == 'regulated' and
+                      a in n[x][y]['orgs'].split() and
+                      b in n[x][y]['orgs'].split(),
+                                                n.edges())
+                                                          )
+        total = len(
+                filter(lambda (x, y):
+                      n[x][y]['kind'] == 'regulated' and
+                      (a in n[x][y]['orgs'].split() or
+                      b in n[x][y]['orgs'].split()),
+                                                n.edges())
+                                                          )
+        
+        dist = 1 - (float(core) / float(total))
+        
+        d[a][b] = dist
+        d[b][a] = dist
+    
+    # Print the distance matrix
+    print '\t'.join( [''] + sorted(orgs) )
+    for o in sorted(orgs):
+        print '\t'.join( [str(o)] + [str(d[o][x]) for x in sorted(orgs)] )
