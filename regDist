@@ -15,9 +15,17 @@ def getOptions():
             default=False,
             dest='babudist',
             help='Compute the distances as Babu et al., 2006 (doi:10.1016/j.jmb.2006.02.019)')
+    parser.add_argument('-D', '--downstream-dist', action="store_true",
+            default=False,
+            dest='downstreamdist',
+            help='Compute the distances considering all the downstream regulated genes')
     return parser.parse_args()
 
 options = getOptions()
+
+if options.babudist and options.downstreamdist:
+    print('Please select only one metric')
+    sys.exit(1)
 
 infile = options.GML_FILE
 n = nx.read_gml(infile)
@@ -28,7 +36,7 @@ for x in n:
     for o in n.node[x]['orgs'].split():
         orgs.add(o)
 
-if not options.babudist:
+if not options.babudist and not options.downstreamdist:
     from scipy.spatial.distance import jaccard
    
     # Distance matrix for the regulators presence
@@ -76,7 +84,7 @@ if not options.babudist:
     for o in sorted(orgs):
         print '\t'.join( [str(o)] + [str(jaccard(d[o], d[x])) for x in sorted(orgs)] )
 
-else:
+elif options.babudist:
     from itertools import combinations
 
     d = {}
@@ -109,6 +117,62 @@ else:
         d[a][b] = dist
         d[b][a] = dist
     
+    # Print the distance matrix
+    print '\t'.join( [''] + sorted(orgs) )
+    for o in sorted(orgs):
+        print '\t'.join( [str(o)] + [str(d[o][x]) for x in sorted(orgs)] )
+
+elif options.downstreamdist:
+    import numpy as np
+    from itertools import combinations
+    from regtools.regnet import getDownstream
+
+    d = {}
+    
+    for o in orgs:
+        d[o] = {}
+        d[o][o] = 0.
+    
+    for a,b in combinations(orgs, 2):
+        d[a] = d.get(a, {})
+        d[b] = d.get(b, {})
+
+    # Analysis has to be done on a regulator basis, since we are not considering
+    # the single regulatory links, but rather the overall downstream genes
+    downstream = {}
+    for x in filter(lambda x: n.node[x]['kind'] == 'regulator', n):
+        downstream[x] = downstream.get(x, {})
+        for o in orgs:
+            # Is the regulator even present in this org?
+            if o not in n.node[x]['orgs'].split():
+                downstream[x][o] = set([])
+                continue
+        
+            down = getDownstream(n, x, o)
+            
+            downstream[x][o] = set(down)
+    
+    # Beware of corner cases
+    # 1. No regulator in both orgs
+    # 2. No downstream genes in both orgs
+    for a,b in combinations(orgs, 2):
+        dists = []
+        
+        for x in filter(lambda x: n.node[x]['kind'] == 'regulator', n):
+            core = len( downstream[x][a].intersection(downstream[x][b]) )
+            
+            total = len( downstream[x][a].union(downstream[x][b]) )
+        
+            if total == 0:
+                dist = 1
+            else:
+                dist = 1 - (float(core) / float(total))
+                
+            dists.append(dist)
+        
+        d[a][b] = np.array(dists).mean()
+        d[b][a] = np.array(dists).mean()
+        
     # Print the distance matrix
     print '\t'.join( [''] + sorted(orgs) )
     for o in sorted(orgs):

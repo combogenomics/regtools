@@ -90,10 +90,26 @@ def getPlug(net, node, org):
         if org not in orgs:
             del tree[a][b]
     
-    # To another DFS on the pruned tree
+    # Do another DFS on the pruned tree
     tree = nx.depth_first_search.dfs_tree(tree, node)
     
     return tree.edges()
+    
+def getDownstream(net, node, org):
+    # Extract the DFS tree
+    tree = nx.depth_first_search.dfs_tree(net, node)
+    
+    # Prune the DFS tree
+    for a, b in tree.edges():
+        orgs = net[a][b]['orgs'].split()
+        
+        if org not in orgs:
+            del tree[a][b]
+    
+    # Do another DFS on the pruned tree
+    tree = nx.depth_first_search.dfs_tree(tree, node)
+    
+    return tree.nodes()
 
 def getPlugLen(net, node, org):
     return len(getPlug(net, node, org))
