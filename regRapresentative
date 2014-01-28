@@ -1,0 +1,72 @@
+#!/usr/bin/python
+
+import sys
+import networkx as nx
+import random
+from Bio import SeqIO
+import os
+import numpy as np
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Org-to-org distance on pangenome scale regulatory networks")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('GML_FILE', action='store',
+                            help='Pangenome regulatory network')
+    parser.add_argument('PANGENOME_FILE', action='store',
+                            help='orth_id --> prot_id file')
+    parser.add_argument('PROTEIN_DIR', action='store',
+                            help='Protein fasta file(s) directory (*.faa files)')
+    return parser.parse_args()
+
+options = getOptions()
+
+print('Reading regulatory network')
+infile = options.GML_FILE
+n = nx.read_gml(infile)
+
+print('Reading pangenome')
+p = {}
+for l in open(options.PANGENOME_FILE):
+    if l.startswith('#'):continue
+    
+    orth_id, prot_id = l.strip().split('\t')
+    
+    p[orth_id] = p.get(orth_id, set())
+    p[orth_id].add( prot_id )
+    
+print('Reading proteins')
+d = {}
+for f in os.listdir(options.PROTEIN_DIR):
+    if not f.endswith('.faa'):continue
+    
+    print('\t%s'%os.path.join( options.PROTEIN_DIR, f ))
+    
+    for s in SeqIO.parse(os.path.join( options.PROTEIN_DIR, f ), 'fasta'):
+        # Ugly bugfix
+        if s.id.count('|') == 1:
+            d[s.id.split('|')[0]] = s
+        else:
+            d[s.id] = s
+
+print('Preparing representative sequences')
+reprs = set()
+for x in n.nodes():
+    prot = list(p[ n.node[x]['label'] ])
+    
+    # Random sequence
+    random.shuffle(prot)
+    
+    candidate = prot[0]
+    
+    # Sanity check for some corner cases
+    if candidate not in d:
+        print('Skipping %s'%candidate)
+        continue
+    candidate = d[candidate]
+    candidate.id = n.node[x]['label']
+    reprs.add(candidate)
+    
+SeqIO.write(sorted(reprs, key=lambda x: x.id), 'representative.faa', 'fasta')
