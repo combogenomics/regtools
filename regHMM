@@ -1,0 +1,100 @@
+#!/usr/bin/python
+
+import sys
+import networkx as nx
+import ghmm
+import random
+import numpy as np
+from regtools.regnet import *
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Build HMM from a regulatory network")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('GML_FILE', action='store',
+                            help='Pangenome regulatory network')
+    return parser.parse_args()
+
+options = getOptions()
+
+infile = options.GML_FILE
+n = nx.read_gml(infile)
+
+# Grep the orgs in the net
+orgs = set()
+for x in n:
+    for o in n.node[x]['orgs'].split():
+        orgs.add(o)
+norg = len(orgs)
+
+# Inspect the proportion of conserved and variable regulatory links
+regulators = filter(lambda x: n.node[x]['kind'] == 'regulator', n.nodes())
+reglinks = filter(lambda x: n[x[0]][x[1]]['kind'] == 'regulated',
+                        n.edges())
+
+# Bootstrap the HMMs, since the sequence of states is randomized
+hmms = set()
+orgz = list(orgs)
+for i in range(1000):
+    # Empty HMM
+    nstates = len(dregstates)
+    sigma = ghmm.Alphabet(dregstates.values())
+    A = [[1./nstates] * nstates] * nstates
+    B = []
+    for i in range(nstates):
+        c=[0] * nstates
+        c[i] = 1
+        B.append(c)
+    pi = [1./nstates] * nstates
+    m = ghmm.HMMFromMatrices(sigma, ghmm.DiscreteDistribution(sigma), A, B, pi)
+    
+    allstates = []
+
+    for a, b in reglinks:
+        # Number of orgs in which the regulator, the promoter and the gene are present
+        reg = set(n.node[a]['orgs'].split())
+        prom = set(n[a][b]['orgs'].split())        
+        gene = set(n.node[b]['orgs'].split())
+
+        # Sanity check: promoter cannot be a superset of genes, only a subset
+        if prom.issuperset(gene) and not prom.issubset(gene):
+            raise ValueError('Found a regulator edge with more orgs than the regulated gene (%s --> %s)'%(a, b))
+
+        tr = []
+
+        random.shuffle(orgz)    
+        for o in orgz:
+            state = getRegState(o, reg, prom, gene)
+
+            tr.append( dregstates[state] )
+        
+        allstates.append(tr)
+
+    # Train the HMM
+    s = ghmm.SequenceSet(sigma, allstates)
+    m.baumWelch(s)
+
+    hmms.add(m)
+    
+# Save a DiGraph with transitions/initial probabilities
+net = nx.DiGraph()
+
+for i, name in zip(range(nstates), regstates):
+    w = np.array([m.getInitial(i) for m in hmms]).mean()
+    net.add_node(name, weight=w*100)
+    net.node[name]['graphics'] = {'w' : w*100,
+                                 'h' : w*100}
+
+    net.add_edge(name, name, weight=np.array([m.getTransition(i, i)
+                                                for m in hmms]).mean()*100)
+
+for a, b in itertools.permutations(range(nstates), 2):
+    aname = regstates[a]
+    bname = regstates[b]
+    
+    net.add_edge(aname, bname, weight=np.array([m.getTransition(a, b)
+                                                for m in hmms]).mean()*100)
+                                                
+nx.write_gml(net, 'transitions.gml')

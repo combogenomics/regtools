@@ -7,6 +7,10 @@ import itertools
 regstates = ['plugged', 'unplugged',
              'ready', 'notready', 'absent',
              'missing']
+
+dregstates = {'plugged':'p', 'unplugged':'u',
+             'ready':'r', 'notready':'n', 'absent':'a',
+             'missing':'m'}
              
 def getRegStatesCombinations():
     for a, b in itertools.combinations(sorted(regstates), 2):
