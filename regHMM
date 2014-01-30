@@ -81,8 +81,13 @@ for i in range(1000):
 # Save a DiGraph with transitions/initial probabilities
 net = nx.DiGraph()
 
+print('\t'.join( ['State', 'Initial probability'] ))
+
 for i, name in zip(range(nstates), regstates):
     w = np.array([m.getInitial(i) for m in hmms]).mean()
+    
+    print('\t'.join( [name, str(w)] ))
+    
     net.add_node(name, weight=w*100)
     net.node[name]['graphics'] = {'w' : w*100,
                                  'h' : w*100}
@@ -90,11 +95,23 @@ for i, name in zip(range(nstates), regstates):
     net.add_edge(name, name, weight=np.array([m.getTransition(i, i)
                                                 for m in hmms]).mean()*100)
 
+print('')
+
+print('\t'.join( ['State 1', 'State 2', 'Transition probability'] ))
+
+for i, name in zip(range(nstates), regstates):
+    print(('\t'.join( [name, name, str(np.array([m.getTransition(i, i)
+                                                for m in hmms]).mean())] )))
+
 for a, b in itertools.permutations(range(nstates), 2):
     aname = regstates[a]
     bname = regstates[b]
     
-    net.add_edge(aname, bname, weight=np.array([m.getTransition(a, b)
-                                                for m in hmms]).mean()*100)
+    w = np.array([m.getTransition(a, b)
+                        for m in hmms]).mean()
+                        
+    print(('\t'.join( [aname, bname, str(w)] )))
+                        
+    net.add_edge(aname, bname, weight=w*100)
                                                 
 nx.write_gml(net, 'transitions.gml')
