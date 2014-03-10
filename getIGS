@@ -21,6 +21,8 @@ gbkdir = sys.argv[1]
 notf = open('notfound.txt', 'w')
     
 for infile in os.listdir(gbkdir):
+    if os.path.isdir(os.path.join(gbkdir, infile)):continue
+
     i = 0
     rseqs = []
     
