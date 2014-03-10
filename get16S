@@ -1,0 +1,66 @@
+#!/usr/bin/pypy
+
+import sys
+import os
+import re
+from Bio import SeqIO
+
+if len(sys.argv) < 2:
+    print('USAGE: get16S GBK_DIR')
+    sys.exit(65)
+
+# rRNA magic regex
+regex = '(.*)16[sS]'
+prog = re.compile(regex)
+
+print('Using /%s/ regex search'%regex)
+print('')
+
+gbkdir = sys.argv[1]
+
+notf = open('notfound.txt', 'w')
+    
+for infile in os.listdir(gbkdir):
+    if os.path.isdir(os.path.join(gbkdir,infile)):continue
+    
+    i = 0
+    rseqs = []
+    
+    print('Reading %s'%infile)
+    
+    org = infile.split('.')[0]
+    
+    for s in SeqIO.parse(os.path.join(gbkdir, infile), 'genbank'):
+        rRNA = sorted(filter(lambda x: x.type == 'rRNA', s.features),
+                    key=lambda x: int(x.location.start))
+        for f in rRNA:
+            # Is it 16S?
+            if not prog.match(f.qualifiers['product'][0]):
+                continue
+                
+            #print f.qualifiers['product'][0], f1.qualifiers['product'][0]
+     
+            i += 1
+            rid = '%s_%d'%(org, i)
+            
+            rseq = s[int(f.location.start): int(f.location.end)+1]
+            if f.strand < 0:
+                rseq = rseq.reverse_complement()
+                rseq.description = '(%s, %d, %d, -)'%(s.id,
+                    int(f.location.start), int(f.location.end)+1)
+            else:
+                rseq.description = '(%s, %d, %d, +)'%(s.id,
+                    int(f.location.start), int(f.location.end)+1)    
+            rseq.id = rid
+            
+            rseqs.append(rseq)
+            
+    if len(rseqs) == 0:
+        print ('No 16S found for %s'%org)
+        notf.write('%s\n'%org)
+        continue
+    
+    print('Found %d 16S in %s'%(len(rseqs), org))
+    SeqIO.write(rseqs, '%s.rna.fna'%org, 'fasta')
+
+notf.close()
