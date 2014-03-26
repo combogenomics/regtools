@@ -1,0 +1,45 @@
+#!/usr/bin/python
+
+import sys
+import networkx as nx
+from regtools.regnet import getDownstream
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Prepare a file for each regulator w/ dowstream genes")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('GML_FILE', action='store',
+                            help='Pangenome regulatory network')
+    
+    return parser.parse_args()
+
+options = getOptions()
+
+infile = options.GML_FILE
+n = nx.read_gml(infile)
+
+# Grep the orgs in the net
+orgs = set()
+for x in n:
+    for o in n.node[x]['orgs'].split():
+        orgs.add(o)
+
+# Prepare a pairs file for each regulator
+for x in filter(lambda x: n.node[x]['kind'] == 'regulator', n):
+    print(x)
+    allo = set()
+    for o in orgs:
+        # Is the regulator even present in this org?
+        if o not in n.node[x]['orgs'].split():
+            continue
+        
+        down = getDownstream(n, x, o)
+        for g in down:
+            allo.add(n.node[g]['label'])
+
+    f = open('%s.query'%x, 'w')
+    for g in allo:
+        f.write('%s\n'%(g))
+    f.close()
