@@ -19,11 +19,22 @@ def getOptions():
             default=False,
             dest='downstreamdist',
             help='Compute the distances considering all the downstream regulated genes')
+    
+    parser.add_argument('-S', '--semnatic-dist', action="store_true",
+            default=False,
+            dest='semanticdist',
+            help='Compute the distances loading gene pairs semantic similarities')
+    parser.add_argument('-s', metavar='semanticDir', action='store',
+            dest='semdir',
+            default=None,
+            help='Semantic similarity directory (regID.*)')
+
     return parser.parse_args()
 
 options = getOptions()
 
-if options.babudist and options.downstreamdist:
+metric = [options.babudist, options.downstreamdist, options.semanticdist]
+if True in metric and metric.count(True) > 1:
     print('Please select only one metric')
     sys.exit(1)
 
@@ -36,7 +47,7 @@ for x in n:
     for o in n.node[x]['orgs'].split():
         orgs.add(o)
 
-if not options.babudist and not options.downstreamdist:
+if not options.babudist and not options.downstreamdist and not options.semanticdist:
     from scipy.spatial.distance import jaccard
    
     # Distance matrix for the regulators presence
@@ -177,3 +188,72 @@ elif options.downstreamdist:
     print '\t'.join( [''] + sorted(orgs) )
     for o in sorted(orgs):
         print '\t'.join( [str(o)] + [str(d[o][x]) for x in sorted(orgs)] )
+
+elif options.semanticdist:
+    import os
+    import numpy as np
+    from itertools import combinations
+    from regtools.regnet import getDownstream
+    
+    semantic = os.listdir(options.semdir)
+
+    d = {}
+    
+    for o in orgs:
+        d[o] = {}
+        d[o][o] = 0.
+    
+    for a,b in combinations(orgs, 2):
+        d[a] = d.get(a, {})
+        d[a][b] = []
+        d[b] = d.get(b, {})
+        d[b][a] = []
+    
+    # Analysis has to be done on a regulator basis, since we are not considering
+    # the single regulatory links, but rather the overall downstream genes
+    downstream = {}
+    for x in filter(lambda x: n.node[x]['kind'] == 'regulator', n):
+        downstream[x] = downstream.get(x, {})
+        for o in orgs:
+            # Is the regulator even present in this org?
+            if o not in n.node[x]['orgs'].split():
+                downstream[x][o] = set([])
+                continue
+        
+            down = getDownstream(n, x, o)
+            
+            downstream[x][o] = set([n.node[y]['label'] for y in down])
+
+    for x in filter(lambda x: n.node[x]['kind'] == 'regulator', n):
+        # Read the semantic similarity file
+        sem = {}
+        for l in open(os.path.join(options.semdir,
+                                   str(x))):
+            s = l.strip().split('\t')
+            sem[s[0]] = sem.get(s[1], {})
+            sem[s[0]][s[1]] = float(s[2])
+            sem[s[1]] = sem.get(s[0], {})
+            sem[s[1]][s[0]] = float(s[2])
+
+        for a,b in combinations(orgs, 2):
+            ag = downstream[x][a]
+            bg = downstream[x][b]
+
+            dist = []
+            for i in ag:
+                if i not in sem:continue
+                for j in bg:
+                    if j not in sem:continue
+                    dist.append(sem[i][j])
+
+            if len(dist) == 0:
+                continue
+
+            d[a][b].append( np.array(dist).mean() )
+            d[b][a].append( np.array(dist).mean() )
+
+    # Print the distance matrix
+    print '\t'.join( [''] + sorted(orgs) )
+    for o in sorted(orgs):
+        print '\t'.join( [str(o)] + [str(np.array(d[o][x]).mean()) for x in sorted(orgs)] )
+    
