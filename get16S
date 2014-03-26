@@ -6,11 +6,11 @@ import re
 from Bio import SeqIO
 
 if len(sys.argv) < 2:
-    print('USAGE: getIGS GBK_DIR')
+    print('USAGE: get16S GBK_DIR')
     sys.exit(65)
 
 # rRNA magic regex
-regex = '(.*)16[sS]|(.*)23[sS]'    
+regex = '(.*)16[sS]'
 prog = re.compile(regex)
 
 print('Using /%s/ regex search'%regex)
@@ -21,8 +21,8 @@ gbkdir = sys.argv[1]
 notf = open('notfound.txt', 'w')
     
 for infile in os.listdir(gbkdir):
-    if os.path.isdir(os.path.join(gbkdir, infile)):continue
-
+    if os.path.isdir(os.path.join(gbkdir,infile)):continue
+    
     i = 0
     rseqs = []
     
@@ -33,43 +33,34 @@ for infile in os.listdir(gbkdir):
     for s in SeqIO.parse(os.path.join(gbkdir, infile), 'genbank'):
         rRNA = sorted(filter(lambda x: x.type == 'rRNA', s.features),
                     key=lambda x: int(x.location.start))
-        for f, f1 in zip(rRNA, rRNA[1:]):
-            # Are we between 16s and 23s?
-            if not prog.match(f.qualifiers['product'][0]) or not prog.match(f1.qualifiers['product'][0]):
+        for f in rRNA:
+            # Is it 16S?
+            if not prog.match(f.qualifiers['product'][0]):
                 continue
                 
             #print f.qualifiers['product'][0], f1.qualifiers['product'][0]
      
-            # We suppose they should be in the same strand, right?
-            if f.strand != f1.strand:
-                continue
-                
-            # Check that the two features are not so distant from each other
-            dist = int(f1.location.start) - int(f.location.end)
-            if dist > 30000:
-                print('Suspicious long IGS (%d)'%(dist))
-     
             i += 1
             rid = '%s_%d'%(org, i)
             
-            rseq = s[int(f.location.end)+1: int(f1.location.start)-1]
+            rseq = s[int(f.location.start): int(f.location.end)+1]
             if f.strand < 0:
                 rseq = rseq.reverse_complement()
                 rseq.description = '(%s, %d, %d, -)'%(s.id,
-                    int(f.location.end)+1, int(f1.location.start)-1)
+                    int(f.location.start), int(f.location.end)+1)
             else:
                 rseq.description = '(%s, %d, %d, +)'%(s.id,
-                    int(f.location.end)+1, int(f1.location.start)-1)    
+                    int(f.location.start), int(f.location.end)+1)    
             rseq.id = rid
             
             rseqs.append(rseq)
             
     if len(rseqs) == 0:
-        print ('No IGS found for %s'%org)
+        print ('No 16S found for %s'%org)
         notf.write('%s\n'%org)
         continue
     
-    print('Found %d IGS in %s'%(len(rseqs), org))
+    print('Found %d 16S in %s'%(len(rseqs), org))
     SeqIO.write(rseqs, '%s.rna.fna'%org, 'fasta')
 
 notf.close()
