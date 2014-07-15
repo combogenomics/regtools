@@ -1,0 +1,46 @@
+#!/usr/bin/python
+'''
+From a regulatory network get for each regulator
+the size of the conserved regulon
+
+The network should be in GML format
+'''
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("From a regulatory network get all the core regulon")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('gmlfile', action='store', 
+                            help='Regulatory network GML file')
+    return parser.parse_args()
+
+options = getOptions()
+
+import networkx as nx
+import numpy as np
+
+n = nx.parse_gml(open(options.gmlfile))
+
+# Grep the orgs in the net
+orgs = set()
+for x in n:
+    for o in n.node[x]['orgs'].split():
+        orgs.add(o)
+norg = len(orgs)
+
+# Get the regulators
+regulators = filter(lambda x: n.node[x]['kind'] == 'regulator', n.nodes())
+
+for reg in regulators:
+    # Get all the downstream genes, then filter them by the number of strains
+    nodes = nx.depth_first_search.dfs_successors(n, reg)
+    
+    core = filter(lambda x: len(set(n.node[x]['orgs'].split())) == norg, nodes)
+
+    # Get the average number of downstream genes
+    # to get the proportion of conserved downstream genes
+    avgreg = np.array([len(filter(lambda x: o in n.node[x]['orgs'].split(), nodes)) for o in orgs]).mean()
+
+    print('%s\t%.2f'%(n.node[reg]['name'], len(core)/avgreg))
