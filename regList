@@ -1,0 +1,35 @@
+#!/usr/bin/python
+
+import sys
+import networkx as nx
+
+def getOptions():
+    import argparse
+
+    # create the top-level parser
+    description = ("Build list of regulated genes from a regulatory network")
+    parser = argparse.ArgumentParser(description = description)
+    parser.add_argument('GML_FILE', action='store',
+                            help='Pangenome regulatory network')
+    return parser.parse_args()
+
+options = getOptions()
+
+infile = options.GML_FILE
+n = nx.read_gml(infile)
+
+# Inspect the proportion of conserved and variable regulatory links
+regulators = filter(lambda x: 'name' in n.node[x], n.nodes())
+
+for r in regulators:
+    tree = nx.depth_first_search.dfs_tree(n, r)
+
+    for g in sorted(tree.nodes(), key=lambda x: n.node[x]['label']):
+        if g == r: continue
+
+        if 'operon' in n.node[g]:
+            print('\t'.join( [n.node[r]['name'], n.node[r]['label'],
+                              n.node[g]['label'], 'operon'] ))
+        else:
+            print('\t'.join( [n.node[r]['name'], n.node[r]['label'],
+                              n.node[g]['label'], 'regulated'] ))
