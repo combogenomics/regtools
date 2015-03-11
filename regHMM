@@ -34,84 +34,115 @@ regulators = filter(lambda x: n.node[x]['kind'] == 'regulator', n.nodes())
 reglinks = filter(lambda x: n[x[0]][x[1]]['kind'] == 'regulated',
                         n.edges())
 
-# Bootstrap the HMMs, since the sequence of states is randomized
-hmms = set()
-orgz = list(orgs)
-for i in range(1000):
-    # Empty HMM
-    nstates = len(dregstates)
-    sigma = ghmm.Alphabet(dregstates.values())
-    A = [[1./nstates] * nstates] * nstates
-    B = []
-    for i in range(nstates):
-        c=[0] * nstates
-        c[i] = 1
-        B.append(c)
-    pi = [1./nstates] * nstates
-    m = ghmm.HMMFromMatrices(sigma, ghmm.DiscreteDistribution(sigma), A, B, pi)
-    
-    allstates = []
+dinitial = {}
+dtrans = {}
 
-    for a, b in reglinks:
-        # Number of orgs in which the regulator, the promoter and the gene are present
-        reg = set(n.node[a]['orgs'].split())
-        prom = set(n[a][b]['orgs'].split())        
-        gene = set(n.node[b]['orgs'].split())
+# Empty HMM
+nstates = len(dregstates)
+sigma = ghmm.Alphabet(dregstates.values())
+A = [[1./nstates] * nstates] * nstates
+B = []
+for i in range(nstates):
+    c=[0] * nstates
+    c[i] = 1
+    B.append(c)
+pi = [1./nstates] * nstates
+m = ghmm.HMMFromMatrices(sigma, ghmm.DiscreteDistribution(sigma), A, B, pi)
 
-        # Sanity check: promoter cannot be a superset of genes, only a subset
-        if prom.issuperset(gene) and not prom.issubset(gene):
-            raise ValueError('Found a regulator edge with more orgs than the regulated gene (%s --> %s)'%(a, b))
+allstates = []
+
+for a, b in reglinks:
+    # Number of orgs in which the regulator, the promoter and the gene are present
+    reg = set(n.node[a]['orgs'].split())
+    prom = set(n[a][b]['orgs'].split())        
+    gene = set(n.node[b]['orgs'].split())
+
+    # Sanity check: promoter cannot be a superset of genes, only a subset
+    if prom.issuperset(gene) and not prom.issubset(gene):
+        raise ValueError('Found a regulator edge with more orgs than the regulated gene (%s --> %s)'%(a, b))
+
+    for o in orgs:
+        state = getRegState(o, reg, prom, gene)
+        dinitial[state] = dinitial.get(state, {})
+        dinitial[state][o] = dinitial[state].get(o, 0)
+        dinitial[state][o] += 1
+
+    for o1, o2 in itertools.product(orgs, orgs):
+        if o1 == o2:
+            continue
 
         tr = []
+        state1 = getRegState(o1, reg, prom, gene)
+        tr.append( dregstates[state1] )
+        state2 = getRegState(o2, reg, prom, gene)
+        tr.append( dregstates[state2] )
 
-        random.shuffle(orgz)    
-        for o in orgz:
-            state = getRegState(o, reg, prom, gene)
-
-            tr.append( dregstates[state] )
+        dtrans[state1] = dtrans.get(state1, {})
+        dtrans[state1][state2] = dtrans[state1].get(state2, {})
+        dtrans[state1][state2][o1] = dtrans[state1][state2].get(o1, 0)
+        dtrans[state1][state2][o1] += 1
+    
+        #dtrans[state2] = dtrans.get(state2, {})
+        #dtrans[state2][state1] = dtrans[state2].get(state1, {})
+        #dtrans[state2][state1][o2] = dtrans[state2][state1].get(o2, 0)
+        #dtrans[state2][state1][o2] += 1
         
         allstates.append(tr)
 
-    # Train the HMM
-    s = ghmm.SequenceSet(sigma, allstates)
-    m.baumWelch(s)
+dtransitions = {}
+for a, b in itertools.permutations(range(nstates), 2):
+    aname = regstates[a]
+    bname = regstates[b]
 
-    hmms.add(m)
-    
+    dtransitions[(aname, bname)] = np.array([dtrans[aname][bname].get(x, 0)/float(len(reglinks)*(len(orgs)-1)) for x in orgs]).mean()
+
+for a in range(nstates):
+    aname = regstates[a]
+    bname = regstates[a]
+
+    dtransitions[(aname, bname)] = np.array([dtrans[aname][bname].get(x, 0)/float(len(reglinks)*(len(orgs)-1)) for x in orgs]).mean()
+
+random.shuffle(allstates)
+# Train the HMM
+s = ghmm.SequenceSet(sigma, allstates[:1000000])
+m.baumWelch(s)
+
 # Save a DiGraph with transitions/initial probabilities
 net = nx.DiGraph()
 
 print('\t'.join( ['State', 'Initial probability'] ))
 
 for i, name in zip(range(nstates), regstates):
-    w = np.array([m.getInitial(i) for m in hmms]).mean()
-    
-    print('\t'.join( [name, str(w)] ))
+    w = m.getInitial(i)
+    #w = np.array([dinitial[name].get(x, 0)/float(len(reglinks)) for x in orgs]).mean()
+
+    print('\t'.join( [name, str(w*100)] ))
     
     net.add_node(name, weight=w*100)
     net.node[name]['graphics'] = {'w' : w*100,
                                  'h' : w*100}
 
-    net.add_edge(name, name, weight=np.array([m.getTransition(i, i)
-                                                for m in hmms]).mean()*100)
+    t = dtransitions[(name, name)]
+    net.add_edge(name, name, weight=t*100)
 
 print('')
 
 print('\t'.join( ['State 1', 'State 2', 'Transition probability'] ))
 
 for i, name in zip(range(nstates), regstates):
-    print(('\t'.join( [name, name, str(np.array([m.getTransition(i, i)
-                                                for m in hmms]).mean())] )))
-
+    print(('\t'.join( [name, name, str(m.getTransition(i, i))] )))
+    #print('\t'.join([name, name,
+    #    str(dtransitions[(name, name)]*100)]))
+    
 for a, b in itertools.permutations(range(nstates), 2):
     aname = regstates[a]
     bname = regstates[b]
     
-    w = np.array([m.getTransition(a, b)
-                        for m in hmms]).mean()
+    w = m.getTransition(a, b)
+    #t = dtransitions[(aname, bname)]
                         
-    print(('\t'.join( [aname, bname, str(w)] )))
+    print(('\t'.join( [aname, bname, str(w*100)] )))
                         
-    net.add_edge(aname, bname, weight=w*100)
+    net.add_edge(aname, bname, weight=t*100)
                                                 
 nx.write_gml(net, 'transitions.gml')
